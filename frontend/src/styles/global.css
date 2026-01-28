@@ -1,0 +1,119 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --color-yellow: #fff740;
+  --color-pink: #ff7eb9;
+  --color-blue: #7afcff;
+  --color-green: #98fb98;
+  --color-orange: #ffb347;
+  --color-purple: #dda0dd;
+
+  --shadow-note: 2px 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-note-hover: 4px 8px 16px rgba(0, 0, 0, 0.3);
+  --shadow-note-dragging: 8px 12px 24px rgba(0, 0, 0, 0.4);
+
+  --font-handwriting: 'Caveat', cursive;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --cork-color: #c4a77d;
+  --cork-dark: #a08060;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  background: #fff;
+}
+
+/* App layout */
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 250px;
+  transition: margin-left 0.2s ease;
+  overflow: hidden;
+}
+
+/* Loading state */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #333;
+}
+
+.app-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid #333;
+  outline-offset: 2px;
+}
+
+input, textarea {
+  font-family: var(--font-handwriting);
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}

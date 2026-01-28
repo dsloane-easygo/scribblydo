@@ -1,0 +1,207 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: todo-app-aws
+
+resources:
+  - ../../base
+  - pdb.yaml
+
+namespace: todo-app
+
+# AWS environment labels
+labels:
+  - pairs:
+      environment: aws
+      cloud-provider: aws
+    includeSelectors: false
+
+# Replace placeholder images with ECR images
+images:
+  - name: FRONTEND_IMAGE
+    newName: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/todo-frontend
+    newTag: latest
+  - name: BACKEND_IMAGE
+    newName: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/todo-backend
+    newTag: latest
+
+patches:
+  # Patch ConfigMap for AWS environment
+  - target:
+      kind: ConfigMap
+      name: todo-app-config
+    patch: |
+      - op: replace
+        path: /data/ENVIRONMENT
+        value: production
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: INFO
+  # Patch ingress for AWS ALB ingress controller
+  - target:
+      kind: Ingress
+      name: todo-app-ingress
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: todo.vclusters.company.com
+      - op: add
+        path: /spec/ingressClassName
+        value: alb
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1scheme
+        value: internet-facing
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1target-type
+        value: ip
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1listen-ports
+        value: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1ssl-redirect
+        value: "443"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1healthcheck-path
+        value: /healthz
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1healthcheck-interval-seconds
+        value: "15"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1healthcheck-timeout-seconds
+        value: "5"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1success-codes
+        value: "200"
+      - op: remove
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1proxy-body-size
+      - op: remove
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1proxy-connect-timeout
+      - op: remove
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1proxy-send-timeout
+      - op: remove
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1proxy-read-timeout
+
+  # Add TLS configuration
+  - target:
+      kind: Ingress
+      name: todo-app-ingress
+    patch: |
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts:
+              - todo.vclusters.company.com
+            secretName: todo-app-tls
+
+  # Increase replicas for production
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # Production resource allocation
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 128Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi
+
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 200m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+
+  - target:
+      kind: Deployment
+      name: postgres
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 250m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+
+  # Larger PVC for production with GP3 storage class
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgres-pvc
+    patch: |
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 20Gi
+      - op: add
+        path: /spec/storageClassName
+        value: gp3
+
+  # Add topology spread constraints for high availability
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: frontend
+                app.kubernetes.io/component: web
+
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: backend
+                app.kubernetes.io/component: api

@@ -1,0 +1,136 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: todo-app-local
+
+resources:
+  - ../../base
+
+namespace: todo-app
+
+# Local environment labels
+labels:
+  - pairs:
+      environment: local
+    includeSelectors: false
+
+# Replace placeholder images with local development images
+images:
+  - name: FRONTEND_IMAGE
+    newName: todo-frontend
+    newTag: local
+  - name: BACKEND_IMAGE
+    newName: todo-backend
+    newTag: local
+
+patches:
+  # Patch ConfigMap for local environment
+  - target:
+      kind: ConfigMap
+      name: todo-app-config
+    patch: |
+      - op: replace
+        path: /data/ENVIRONMENT
+        value: local
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: DEBUG
+
+  # Patch Secret for local environment
+  - target:
+      kind: Secret
+      name: postgres-secret
+    patch: |
+      - op: replace
+        path: /stringData/POSTGRES_USER
+        value: todouser
+      - op: replace
+        path: /stringData/POSTGRES_PASSWORD
+        value: localdevpassword
+      - op: replace
+        path: /stringData/POSTGRES_DB
+        value: tododb
+  # Patch frontend service to NodePort for local access
+  - target:
+      kind: Service
+      name: frontend-service
+    patch: |
+      - op: replace
+        path: /spec/type
+        value: NodePort
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30080
+
+  # Patch ingress for local hostname
+  - target:
+      kind: Ingress
+      name: todo-app-ingress
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: todo.vc.local
+      - op: add
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1rewrite-target
+        value: /
+
+  # Reduce replicas for local development
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # Reduce resource requests for local environment
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 25m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 32Mi
+
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 64Mi
+
+  - target:
+      kind: Deployment
+      name: postgres
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 128Mi
+
+  # Smaller PVC for local development
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgres-pvc
+    patch: |
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi

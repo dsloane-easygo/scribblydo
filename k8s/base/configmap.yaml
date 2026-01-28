@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-app-config
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/name: todo-app
+    app.kubernetes.io/part-of: todo-application
+data:
+  # Backend configuration
+  DATABASE_HOST: "postgres-service"
+  DATABASE_PORT: "5432"
+  BACKEND_HOST: "0.0.0.0"
+  BACKEND_PORT: "8000"
+
+  # Frontend configuration
+  BACKEND_URL: "http://backend-service:8000"
+
+  # Application settings
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"

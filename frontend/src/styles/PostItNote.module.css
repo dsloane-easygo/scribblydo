@@ -1,0 +1,222 @@
+.noteWrapper {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+}
+
+.noteWrapper.dragging {
+  z-index: 1000;
+}
+
+.note {
+  width: 200px;
+  min-height: 180px;
+  padding: 12px 16px 16px;
+  background: var(--note-color, var(--color-yellow));
+  box-shadow: var(--shadow-note);
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Folded corner effect */
+.note::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 24px 24px 0;
+  border-color: transparent rgba(0, 0, 0, 0.1) transparent transparent;
+}
+
+.note::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+}
+
+.noteWrapper:hover .note {
+  box-shadow: var(--shadow-note-hover);
+}
+
+.noteWrapper.dragging .note {
+  cursor: grabbing;
+  box-shadow: var(--shadow-note-dragging);
+  transform: rotate(2deg) scale(1.02);
+}
+
+/* Pin/pushpin effect */
+.pin {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
+  border-radius: 50%;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  z-index: 10;
+}
+
+.pin::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 8px;
+  background: linear-gradient(to bottom, #7f8c8d, #95a5a6);
+  border-radius: 0 0 1px 1px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-right: 16px;
+}
+
+.titleInput {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  width: 100%;
+  padding: 4px 0;
+  line-height: 1.2;
+}
+
+.titleInput::placeholder {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.noteWrapper:hover .actions {
+  opacity: 1;
+}
+
+.actionButton {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.actionButton:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.deleteButton:hover {
+  background: rgba(220, 53, 69, 0.8);
+  color: white;
+}
+
+.contentInput {
+  flex: 1;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  color: #444;
+  min-height: 100px;
+}
+
+.contentInput::placeholder {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+.colorPicker {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.noteWrapper:hover .colorPicker {
+  opacity: 1;
+}
+
+.colorOption {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+.colorOption:hover {
+  transform: scale(1.2);
+}
+
+.colorOption.active {
+  border-color: #333;
+}
+
+/* Note colors */
+.note.yellow { --note-color: var(--color-yellow); }
+.note.pink { --note-color: var(--color-pink); }
+.note.blue { --note-color: var(--color-blue); }
+.note.green { --note-color: var(--color-green); }
+.note.orange { --note-color: var(--color-orange); }
+.note.purple { --note-color: var(--color-purple); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .note {
+    width: 160px;
+    min-height: 150px;
+    padding: 10px 12px 12px;
+  }
+
+  .titleInput {
+    font-size: 1.1rem;
+  }
+
+  .contentInput {
+    font-size: 1rem;
+    min-height: 80px;
+  }
+
+  .actions {
+    opacity: 1;
+  }
+
+  .colorPicker {
+    opacity: 1;
+  }
+}
