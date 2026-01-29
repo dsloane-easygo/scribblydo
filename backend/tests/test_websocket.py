@@ -340,6 +340,152 @@ class TestConnectionManager:
             assert manager.is_user_viewing_whiteboard(user_id, other_whiteboard_id) is False
 
 
+class TestConnectionManagerEdgeCases:
+    """Additional edge case tests for ConnectionManager."""
+
+    @pytest_asyncio.fixture
+    async def manager(self):
+        """Create a fresh connection manager for each test."""
+        return ConnectionManager()
+
+    @pytest.mark.asyncio
+    async def test_setup_user_subscriptions_failure(self, manager):
+        """Test that subscription setup handles failures gracefully."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock(side_effect=Exception("NATS error"))
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            # Should not raise, just log warning
+            conn = await manager.connect(ws, user_id, "testuser")
+            assert conn is not None
+
+    @pytest.mark.asyncio
+    async def test_subscribe_to_whiteboard_failure(self, manager):
+        """Test that whiteboard subscription handles failures gracefully."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+        whiteboard_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.whiteboard_subject = MagicMock(return_value=f"whiteboard.{whiteboard_id}")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            conn = await manager.connect(ws, user_id, "testuser")
+
+            # Make subscribe fail for whiteboard
+            mock_nats.subscribe = AsyncMock(side_effect=Exception("NATS error"))
+
+            # Should not raise
+            await manager.join_whiteboard(conn, whiteboard_id)
+            assert conn.current_whiteboard_id == whiteboard_id
+
+    @pytest.mark.asyncio
+    async def test_broadcast_presence_update_nats_failure(self, manager):
+        """Test presence update handles NATS failure gracefully."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.publish_presence_update = AsyncMock(side_effect=Exception("NATS error"))
+
+            # Should not raise
+            conn = await manager.connect(ws, user_id, "testuser")
+            assert conn is not None
+
+    @pytest.mark.asyncio
+    async def test_send_to_connection_failure(self, manager):
+        """Test that send to connection handles failures gracefully."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock(side_effect=Exception("WebSocket error"))
+        user_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            conn = await manager.connect(ws, user_id, "testuser")
+
+            # Should not raise
+            await manager.broadcast_to_user(user_id, {"type": "test"})
+
+    @pytest.mark.asyncio
+    async def test_leave_whiteboard_not_in_whiteboard(self, manager):
+        """Test leaving whiteboard when not viewing any."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            conn = await manager.connect(ws, user_id, "testuser")
+
+            # Should not raise
+            await manager.leave_whiteboard(conn)
+            assert conn.current_whiteboard_id is None
+
+    @pytest.mark.asyncio
+    async def test_disconnect_while_viewing_whiteboard(self, manager):
+        """Test disconnecting while viewing a whiteboard."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+        whiteboard_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.whiteboard_subject = MagicMock(return_value=f"whiteboard.{whiteboard_id}")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            conn = await manager.connect(ws, user_id, "testuser")
+            await manager.join_whiteboard(conn, whiteboard_id)
+            await manager.disconnect(conn)
+
+            assert user_id not in manager._connections
+            assert whiteboard_id not in manager._whiteboard_viewers or len(manager._whiteboard_viewers.get(whiteboard_id, set())) == 0
+
+    @pytest.mark.asyncio
+    async def test_update_cursor_not_in_whiteboard(self, manager):
+        """Test updating cursor when not in a whiteboard."""
+        ws = AsyncMock()
+        ws.send_json = AsyncMock()
+        user_id = uuid4()
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.subscribe = AsyncMock()
+            mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
+            mock_nats.presence_subject = MagicMock(return_value="presence.updates")
+            mock_nats.publish_presence_update = AsyncMock()
+
+            conn = await manager.connect(ws, user_id, "testuser")
+
+            # Should update position but not broadcast
+            await manager.update_cursor(conn, 100.0, 200.0)
+            assert conn.cursor_x == 100.0
+            assert conn.cursor_y == 200.0
+
+
 class TestWebSocketHandlers:
     """Tests for WebSocket message handlers."""
 

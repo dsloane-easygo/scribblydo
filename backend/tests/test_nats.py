@@ -18,7 +18,7 @@ class TestNATSClientManager:
     @pytest.mark.asyncio
     async def test_connect_success(self, nats_manager):
         """Test successful NATS connection."""
-        with patch("app.messaging.nats_client.nats.connect") as mock_connect:
+        with patch("nats.connect") as mock_connect:
             mock_client = AsyncMock()
             mock_connect.return_value = mock_client
 
@@ -32,14 +32,14 @@ class TestNATSClientManager:
         """Test connect when already connected does nothing."""
         nats_manager._connected = True
 
-        with patch("app.messaging.nats_client.nats.connect") as mock_connect:
+        with patch("nats.connect") as mock_connect:
             await nats_manager.connect()
             mock_connect.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_connect_failure(self, nats_manager):
         """Test NATS connection failure raises exception."""
-        with patch("app.messaging.nats_client.nats.connect") as mock_connect:
+        with patch("nats.connect") as mock_connect:
             mock_connect.side_effect = Exception("Connection failed")
 
             with pytest.raises(Exception, match="Connection failed"):

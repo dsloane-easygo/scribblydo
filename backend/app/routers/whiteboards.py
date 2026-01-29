@@ -1,7 +1,7 @@
 """Whiteboards API router with CRUD operations."""
 
 import logging
-from typing import Annotated
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -57,7 +57,7 @@ def whiteboard_to_response(whiteboard: Whiteboard) -> WhiteboardWithOwnerRespons
     )
 
 
-def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLevel | None:
+def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> Optional[PermissionLevel]:
     """Get the user's permission level for a whiteboard."""
     # Owner has implicit admin permission
     if whiteboard.owner_id == user_id:
@@ -439,7 +439,7 @@ async def delete_whiteboard(
 
 @router.get(
     "/users/search",
-    response_model=list[UserResponse],
+    response_model=List[UserResponse],
     summary="Search users for sharing",
     description="Search for users to share a whiteboard with.",
 )
@@ -447,7 +447,7 @@ async def search_users(
     q: str,
     current_user: CurrentUser,
     db: DbSession,
-) -> list[UserResponse]:
+) -> List[UserResponse]:
     """Search for users by username."""
     if len(q) < 2:
         return []

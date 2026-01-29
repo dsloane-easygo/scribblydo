@@ -1,5 +1,6 @@
 """Shared permission checking utilities for whiteboard access control."""
 
+from typing import Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -9,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.models import AccessType, PermissionLevel, Whiteboard
 
 
-def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLevel | None:
+def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> Optional[PermissionLevel]:
     """
     Get the user's permission level for a whiteboard.
 
@@ -41,7 +42,7 @@ def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLeve
 async def get_whiteboard_with_shares(
     whiteboard_id: UUID,
     db: AsyncSession,
-) -> Whiteboard | None:
+) -> Optional[Whiteboard]:
     """
     Get a whiteboard with its shares loaded.
 
@@ -65,7 +66,7 @@ async def check_whiteboard_access(
     user_id: UUID,
     db: AsyncSession,
     require_write: bool = False,
-) -> tuple[Whiteboard | None, PermissionLevel | None, str | None]:
+) -> Tuple[Optional[Whiteboard], Optional[PermissionLevel], Optional[str]]:
     """
     Check if a user has access to a whiteboard.
 
