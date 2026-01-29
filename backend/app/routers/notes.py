@@ -7,11 +7,11 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.auth import CurrentUser
 from app.database import get_db
-from app.models import AccessType, Note, PermissionLevel, User, Whiteboard
+from app.models import Note, PermissionLevel, User
+from app.permissions import check_whiteboard_access
 from app.schemas import (
     NoteCreate,
     NoteListResponse,
@@ -27,93 +27,56 @@ router = APIRouter(prefix="/api/notes", tags=["notes"])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
-def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLevel | None:
-    """Get the user's permission level for a whiteboard."""
-    # Owner has implicit admin permission
-    if whiteboard.owner_id == user_id:
-        return PermissionLevel.ADMIN
-
-    # Public whiteboards grant write access to everyone
-    if whiteboard.access_type == AccessType.PUBLIC:
-        return PermissionLevel.WRITE
-
-    # Check shared access
-    if whiteboard.access_type == AccessType.SHARED:
-        for share in whiteboard.shared_with:
-            if share.user_id == user_id:
-                return share.permission
-
-    # No access
-    return None
-
-
-async def get_whiteboard_with_shares(
-    whiteboard_id: UUID,
-    db: AsyncSession,
-) -> Whiteboard | None:
-    """Get a whiteboard with its shares loaded."""
-    result = await db.execute(
-        select(Whiteboard)
-        .options(selectinload(Whiteboard.shared_with))
-        .where(Whiteboard.id == whiteboard_id)
-    )
-    return result.scalar_one_or_none()
-
-
 async def check_whiteboard_read_access(
     whiteboard_id: UUID,
     user: User,
     db: AsyncSession,
-) -> Whiteboard:
+) -> None:
     """
     Check if user has read access to the whiteboard.
 
-    Returns the whiteboard if accessible, raises HTTPException otherwise.
+    Raises HTTPException if access is denied.
     """
-    whiteboard = await get_whiteboard_with_shares(whiteboard_id, db)
+    whiteboard, permission, error = await check_whiteboard_access(
+        whiteboard_id, user.id, db, require_write=False
+    )
 
-    if whiteboard is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Whiteboard with ID {whiteboard_id} not found",
-        )
-
-    permission = get_user_permission(whiteboard, user.id)
-    if permission is None:
+    if error:
+        if "not found" in error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error,
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this whiteboard",
+            detail=error,
         )
-
-    return whiteboard
 
 
 async def check_whiteboard_write_access(
     whiteboard_id: UUID,
     user: User,
     db: AsyncSession,
-) -> Whiteboard:
+) -> None:
     """
     Check if user has write access to the whiteboard.
 
-    Returns the whiteboard if accessible, raises HTTPException otherwise.
+    Raises HTTPException if access is denied.
     """
-    whiteboard = await get_whiteboard_with_shares(whiteboard_id, db)
+    whiteboard, permission, error = await check_whiteboard_access(
+        whiteboard_id, user.id, db, require_write=True
+    )
 
-    if whiteboard is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Whiteboard with ID {whiteboard_id} not found",
-        )
-
-    permission = get_user_permission(whiteboard, user.id)
-    if permission not in (PermissionLevel.WRITE, PermissionLevel.ADMIN):
+    if error:
+        if "not found" in error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=error,
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Write permission required for this operation",
+            detail=error,
         )
-
-    return whiteboard
 
 
 @router.get(

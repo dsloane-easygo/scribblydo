@@ -28,8 +28,8 @@ function Register({ onSwitchToLogin }) {
         return;
       }
 
-      if (password.length < 4) {
-        setError('Password must be at least 4 characters');
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
         return;
       }
 
@@ -112,7 +112,7 @@ function Register({ onSwitchToLogin }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={4}
+              minLength={8}
               autoComplete="new-password"
               disabled={loading}
             />

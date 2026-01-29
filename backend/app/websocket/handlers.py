@@ -1,9 +1,12 @@
 """WebSocket message handlers."""
 
+import logging
 from typing import Any, Dict
 from uuid import UUID
 
 from app.websocket.connection_manager import UserConnection, manager
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_websocket_message(
@@ -36,7 +39,7 @@ async def handle_websocket_message(
 async def handle_join_whiteboard(
     connection: UserConnection, payload: Dict[str, Any]
 ) -> None:
-    """Handle user joining a whiteboard."""
+    """Handle user joining a whiteboard with access control."""
     whiteboard_id_str = payload.get("whiteboard_id")
     if not whiteboard_id_str:
         await connection.websocket.send_json(
@@ -54,6 +57,44 @@ async def handle_join_whiteboard(
             {
                 "type": "error",
                 "payload": {"code": "invalid_whiteboard_id", "message": "Invalid whiteboard_id format"},
+            }
+        )
+        return
+
+    # Check if user has access to the whiteboard
+    from app.database import async_session_factory
+    from app.permissions import has_whiteboard_read_access
+
+    try:
+        async with async_session_factory() as db:
+            has_access = await has_whiteboard_read_access(
+                whiteboard_id, connection.user_id, db
+            )
+
+        if not has_access:
+            await connection.websocket.send_json(
+                {
+                    "type": "error",
+                    "payload": {
+                        "code": "access_denied",
+                        "message": "You do not have access to this whiteboard",
+                    },
+                }
+            )
+            logger.warning(
+                f"User {connection.username} ({connection.user_id}) attempted to join "
+                f"whiteboard {whiteboard_id} without access"
+            )
+            return
+    except Exception as e:
+        logger.error(f"Error checking whiteboard access: {e}")
+        await connection.websocket.send_json(
+            {
+                "type": "error",
+                "payload": {
+                    "code": "internal_error",
+                    "message": "Failed to verify whiteboard access",
+                },
             }
         )
         return

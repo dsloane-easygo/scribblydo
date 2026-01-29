@@ -5,9 +5,12 @@ import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy import text
 
 from app.config import get_settings
@@ -31,6 +34,10 @@ logging.getLogger("nats").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+# Rate limiter configuration
+# Uses client IP address as the key for rate limiting
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -65,6 +72,10 @@ app = FastAPI(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
+
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 app.add_middleware(

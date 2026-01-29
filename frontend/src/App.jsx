@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './components/Login';
 import Register from './components/Register';
 import Sidebar from './components/Sidebar';
@@ -124,7 +125,11 @@ function App() {
     return <Login onSwitchToRegister={() => setShowRegister(true)} />;
   }
 
-  return <MainApp />;
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
 }
 
 export default App;

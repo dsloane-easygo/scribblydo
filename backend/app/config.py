@@ -1,8 +1,10 @@
 """Application configuration using Pydantic Settings."""
 
+import secrets
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,8 +34,31 @@ class Settings(BaseSettings):
     # CORS settings
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
-    # JWT settings
-    secret_key: str = "change-me-in-production-use-a-long-random-string"
+    # JWT settings - MUST be set via SECRET_KEY environment variable in production
+    secret_key: str = ""
+
+    @field_validator("secret_key", mode="before")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate secret key is set and secure."""
+        insecure_defaults = [
+            "",
+            "change-me-in-production-use-a-long-random-string",
+            "dev-secret-key-change-in-production",
+            "k8s-dev-secret-key-change-in-production",
+        ]
+        if v in insecure_defaults:
+            import os
+            if os.getenv("TESTING", "").lower() == "true":
+                # Allow insecure key only in test environment
+                return secrets.token_urlsafe(32)
+            raise ValueError(
+                "SECRET_KEY environment variable must be set to a secure random value. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        if len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters long")
+        return v
 
     # NATS settings
     nats_url: str = "nats://nats:4222"

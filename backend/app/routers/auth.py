@@ -2,8 +2,10 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,9 @@ from app.schemas import Token, UserCreate, UserResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# Rate limiter for authentication endpoints
+limiter = Limiter(key_func=get_remote_address)
+
 # Type alias for database session dependency
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -30,7 +35,8 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
     summary="Register a new user",
     description="Create a new user account with username and password.",
 )
-async def register(user_data: UserCreate, db: DbSession) -> UserResponse:
+@limiter.limit("10/minute")
+async def register(request: Request, user_data: UserCreate, db: DbSession) -> UserResponse:
     """
     Register a new user.
 
@@ -74,7 +80,9 @@ async def register(user_data: UserCreate, db: DbSession) -> UserResponse:
     summary="Login to get access token",
     description="Authenticate with username and password to receive a JWT token.",
 )
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: DbSession,
 ) -> Token:

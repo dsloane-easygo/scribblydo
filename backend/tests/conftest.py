@@ -3,6 +3,9 @@
 import os
 from typing import AsyncGenerator
 
+# Set testing environment before importing app (required for secret key validation)
+os.environ.setdefault("TESTING", "true")
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient

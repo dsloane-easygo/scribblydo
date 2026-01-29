@@ -41,9 +41,9 @@ class UserCreate(UserBase):
     """Schema for creating a new user (registration)."""
 
     password: str = Field(
-        min_length=4,
+        min_length=8,
         max_length=100,
-        description="User password",
+        description="User password (minimum 8 characters)",
     )
     first_name: Optional[str] = Field(
         default=None,
