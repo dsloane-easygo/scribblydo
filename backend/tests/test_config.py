@@ -116,8 +116,11 @@ class TestSettings:
             assert "http://localhost:5173" in settings.cors_origins
 
     def test_default_nats_url(self):
-        """Test default NATS URL."""
-        with patch.dict(os.environ, {"TESTING": "true"}, clear=False):
+        """Test default NATS URL when NATS_URL is not set."""
+        # Clear NATS_URL to test the default value
+        env_without_nats = {k: v for k, v in os.environ.items() if k != "NATS_URL"}
+        env_without_nats["TESTING"] = "true"
+        with patch.dict(os.environ, env_without_nats, clear=True):
             from app.config import Settings
 
             settings = Settings()
