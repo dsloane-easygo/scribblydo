@@ -14,11 +14,25 @@ services:
       - DB_PASSWORD=postgres
       - DEBUG=false
       - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - NATS_URL=nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
+      nats:
+        condition: service_started
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - todo-network
+
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream", "--http_port", "8222"]
     restart: unless-stopped
     networks:
       - todo-network

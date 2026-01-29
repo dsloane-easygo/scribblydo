@@ -7,15 +7,15 @@ metadata:
     app.kubernetes.io/name: todo-app
     app.kubernetes.io/part-of: todo-application
 data:
-  # Backend configuration
-  DATABASE_HOST: "postgres-service"
-  DATABASE_PORT: "5432"
-  BACKEND_HOST: "0.0.0.0"
-  BACKEND_PORT: "8000"
+  # Backend configuration (matches FastAPI app/config.py expectations)
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "tododb"
 
   # Frontend configuration
   BACKEND_URL: "http://backend-service:8000"
 
   # Application settings
-  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  CORS_ORIGINS: '["*"]'
   ENVIRONMENT: "production"

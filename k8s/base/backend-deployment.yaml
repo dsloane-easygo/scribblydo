@@ -32,6 +32,47 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # Run database migrations before starting the backend
+        - name: migrate
+          image: BACKEND_IMAGE
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: backend
           image: BACKEND_IMAGE
@@ -41,43 +82,46 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
-            - name: DATABASE_HOST
+            - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
                   name: todo-app-config
-                  key: DATABASE_HOST
-            - name: DATABASE_PORT
+                  key: DB_HOST
+            - name: DB_PORT
               valueFrom:
                 configMapKeyRef:
                   name: todo-app-config
-                  key: DATABASE_PORT
-            - name: POSTGRES_USER
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: DB_NAME
+            - name: DB_USER
               valueFrom:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
+            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
-            - name: POSTGRES_DB
+            - name: DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: DEBUG
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: CORS_ORIGINS
+            - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_DB
-            - name: DATABASE_URL
-              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(POSTGRES_DB)"
-            - name: LOG_LEVEL
-              valueFrom:
-                configMapKeyRef:
-                  name: todo-app-config
-                  key: LOG_LEVEL
-            - name: ENVIRONMENT
-              valueFrom:
-                configMapKeyRef:
-                  name: todo-app-config
-                  key: ENVIRONMENT
+                  name: backend-secret
+                  key: SECRET_KEY
           resources:
             requests:
               cpu: 100m
@@ -96,7 +140,7 @@ spec:
               mountPath: /tmp
           livenessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: http
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -104,7 +148,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5

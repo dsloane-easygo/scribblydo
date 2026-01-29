@@ -47,6 +47,43 @@
   flex-direction: column;
 }
 
+.userSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.userName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.logoutButton {
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.logoutButton:hover {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
 .section {
   margin-bottom: 24px;
 }
@@ -92,8 +129,51 @@
   font-size: 14px;
   color: #333;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.whiteboardName {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.privateIcon {
+  font-size: 12px;
+}
+
+.whiteboardOwner {
+  font-size: 11px;
+  color: #999;
+}
+
+.whiteboardActions {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.whiteboardItem:hover .whiteboardActions {
+  opacity: 1;
+}
+
+.privacyButton {
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 12px;
+  transition: color 0.15s;
+}
+
+.privacyButton:hover {
+  color: #333;
 }
 
 .deleteButton {
@@ -103,12 +183,7 @@
   cursor: pointer;
   color: #999;
   font-size: 16px;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
-}
-
-.whiteboardItem:hover .deleteButton {
-  opacity: 1;
+  transition: color 0.15s;
 }
 
 .deleteButton:hover {
@@ -148,6 +223,51 @@
 .createInput:focus {
   outline: none;
   border-color: #666;
+}
+
+.accessSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.accessOption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.accessOption input {
+  cursor: pointer;
+}
+
+.accessOption span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.accessIcon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.accessButton {
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.15s;
+}
+
+.accessButton:hover {
+  opacity: 0.7;
 }
 
 .createActions {
@@ -234,4 +354,149 @@
 .collapsedButton:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+.bottomSection {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.themeToggle {
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.themeToggle:hover {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
+/* Dark mode styles */
+:global(.dark-mode) .sidebar {
+  background: #2d2d2d;
+  border-right-color: #444;
+}
+
+:global(.dark-mode) .userSection {
+  border-bottom-color: #444;
+}
+
+:global(.dark-mode) .userName {
+  color: #e0e0e0;
+}
+
+:global(.dark-mode) .logoutButton {
+  color: #a0a0a0;
+  border-color: #555;
+}
+
+:global(.dark-mode) .logoutButton:hover {
+  background: #3d3d3d;
+  border-color: #666;
+}
+
+:global(.dark-mode) .sectionTitle {
+  color: #777;
+}
+
+:global(.dark-mode) .whiteboardItem:hover {
+  background: #3d3d3d;
+}
+
+:global(.dark-mode) .whiteboardItem.selected {
+  background: #444;
+}
+
+:global(.dark-mode) .whiteboardButton {
+  color: #e0e0e0;
+}
+
+:global(.dark-mode) .whiteboardOwner {
+  color: #777;
+}
+
+:global(.dark-mode) .addWhiteboardButton {
+  color: #a0a0a0;
+  border-color: #555;
+}
+
+:global(.dark-mode) .addWhiteboardButton:hover {
+  color: #e0e0e0;
+  border-color: #777;
+}
+
+:global(.dark-mode) .createInput {
+  background: #3d3d3d;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+:global(.dark-mode) .createInput:focus {
+  border-color: #777;
+}
+
+:global(.dark-mode) .accessOption {
+  color: #a0a0a0;
+}
+
+:global(.dark-mode) .createSubmit {
+  background: #555;
+}
+
+:global(.dark-mode) .createSubmit:hover {
+  background: #666;
+}
+
+:global(.dark-mode) .createCancel {
+  background: #3d3d3d;
+  color: #a0a0a0;
+}
+
+:global(.dark-mode) .createCancel:hover {
+  background: #444;
+}
+
+:global(.dark-mode) .addNoteButton {
+  background: #555;
+}
+
+:global(.dark-mode) .addNoteButton:hover:not(:disabled) {
+  background: #666;
+}
+
+:global(.dark-mode) .addNoteButton:disabled {
+  background: #3d3d3d;
+}
+
+:global(.dark-mode) .bottomSection {
+  border-top-color: #444;
+}
+
+:global(.dark-mode) .themeToggle {
+  border-color: #555;
+}
+
+:global(.dark-mode) .themeToggle:hover {
+  background: #3d3d3d;
+  border-color: #666;
+}
+
+:global(.dark-mode) .toggleButton {
+  background: #3d3d3d;
+  border-color: #555;
+  color: #a0a0a0;
+}
+
+:global(.dark-mode) .toggleButton:hover {
+  background: #444;
 }

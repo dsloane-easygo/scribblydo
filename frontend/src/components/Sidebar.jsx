@@ -1,6 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import styles from '../styles/Sidebar.module.css';
 
+const ACCESS_ICONS = {
+  public: '🌐',
+  private: '🔒',
+  shared: '👥',
+};
+
 /**
  * Sidebar Component
  * Collapsible left navigation for whiteboard management
@@ -8,15 +14,23 @@ import styles from '../styles/Sidebar.module.css';
 function Sidebar({
   whiteboards,
   selectedWhiteboardId,
+  selectedWhiteboard,
   onSelectWhiteboard,
   onCreateWhiteboard,
+  onUpdateWhiteboard,
   onDeleteWhiteboard,
   onAddNote,
   disabled,
+  currentUser,
+  onLogout,
+  isOwner,
+  darkMode,
+  onToggleDarkMode,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newAccessType, setNewAccessType] = useState('public');
 
   const handleToggle = useCallback(() => {
     setIsCollapsed((prev) => !prev);
@@ -25,6 +39,7 @@ function Sidebar({
   const handleCreateClick = useCallback(() => {
     setIsCreating(true);
     setNewName('');
+    setNewAccessType('public');
   }, []);
 
   const handleCreateSubmit = useCallback(
@@ -33,24 +48,26 @@ function Sidebar({
       if (!newName.trim()) return;
 
       try {
-        await onCreateWhiteboard(newName.trim());
+        await onCreateWhiteboard(newName.trim(), newAccessType);
         setIsCreating(false);
         setNewName('');
+        setNewAccessType('public');
       } catch (err) {
         console.error('Failed to create whiteboard:', err);
       }
     },
-    [newName, onCreateWhiteboard]
+    [newName, newAccessType, onCreateWhiteboard]
   );
 
   const handleCreateCancel = useCallback(() => {
     setIsCreating(false);
     setNewName('');
+    setNewAccessType('public');
   }, []);
 
   const handleDelete = useCallback(
     async (id, name) => {
-      if (window.confirm(`Delete whiteboard "${name}" and all its notes?`)) {
+      if (window.confirm(`Delete board "${name}" and all its notes?`)) {
         try {
           await onDeleteWhiteboard(id);
         } catch (err) {
@@ -61,6 +78,26 @@ function Sidebar({
     [onDeleteWhiteboard]
   );
 
+  const cycleAccessType = useCallback(
+    async (wb) => {
+      const order = ['public', 'shared', 'private'];
+      const currentIndex = order.indexOf(wb.access_type);
+      const nextIndex = (currentIndex + 1) % order.length;
+      const nextType = order[nextIndex];
+
+      try {
+        await onUpdateWhiteboard(wb.id, { access_type: nextType });
+      } catch (err) {
+        console.error('Failed to update whiteboard access:', err);
+      }
+    },
+    [onUpdateWhiteboard]
+  );
+
+  const getAccessIcon = (wb) => {
+    return ACCESS_ICONS[wb.access_type] || ACCESS_ICONS.public;
+  };
+
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <button
@@ -68,13 +105,26 @@ function Sidebar({
         onClick={handleToggle}
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {isCollapsed ? '▶' : '◀'}
+        {isCollapsed ? '\u25B6' : '\u25C0'}
       </button>
 
       {!isCollapsed && (
         <div className={styles.content}>
+          <div className={styles.userSection}>
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{currentUser?.username}</span>
+            </div>
+            <button
+              className={styles.logoutButton}
+              onClick={onLogout}
+              title="Sign out"
+            >
+              Sign Out
+            </button>
+          </div>
+
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Whiteboards</h2>
+            <h2 className={styles.sectionTitle}>Boards</h2>
 
             <ul className={styles.whiteboardList}>
               {whiteboards.map((wb) => (
@@ -88,16 +138,36 @@ function Sidebar({
                     className={styles.whiteboardButton}
                     onClick={() => onSelectWhiteboard(wb.id)}
                   >
-                    {wb.name}
+                    <span className={styles.whiteboardName}>
+                      <span className={styles.accessIcon} title={wb.access_type}>
+                        {getAccessIcon(wb)}
+                      </span>
+                      {wb.name}
+                    </span>
+                    <span className={styles.whiteboardOwner}>
+                      {wb.owner_username}
+                    </span>
                   </button>
-                  <button
-                    className={styles.deleteButton}
-                    onClick={() => handleDelete(wb.id, wb.name)}
-                    aria-label={`Delete ${wb.name}`}
-                    title="Delete whiteboard"
-                  >
-                    ×
-                  </button>
+                  {isOwner(wb) && (
+                    <div className={styles.whiteboardActions}>
+                      <button
+                        className={styles.accessButton}
+                        onClick={() => cycleAccessType(wb)}
+                        aria-label={`Change access (currently ${wb.access_type})`}
+                        title={`Click to change access (currently ${wb.access_type})`}
+                      >
+                        {getAccessIcon(wb)}
+                      </button>
+                      <button
+                        className={styles.deleteButton}
+                        onClick={() => handleDelete(wb.id, wb.name)}
+                        aria-label={`Delete ${wb.name}`}
+                        title="Delete board"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -108,13 +178,45 @@ function Sidebar({
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Whiteboard name..."
+                  placeholder="Board name..."
                   className={styles.createInput}
                   autoFocus
                 />
+                <div className={styles.accessSelector}>
+                  <label className={styles.accessOption}>
+                    <input
+                      type="radio"
+                      name="accessType"
+                      value="public"
+                      checked={newAccessType === 'public'}
+                      onChange={(e) => setNewAccessType(e.target.value)}
+                    />
+                    <span>🌐 Public</span>
+                  </label>
+                  <label className={styles.accessOption}>
+                    <input
+                      type="radio"
+                      name="accessType"
+                      value="shared"
+                      checked={newAccessType === 'shared'}
+                      onChange={(e) => setNewAccessType(e.target.value)}
+                    />
+                    <span>👥 Shared</span>
+                  </label>
+                  <label className={styles.accessOption}>
+                    <input
+                      type="radio"
+                      name="accessType"
+                      value="private"
+                      checked={newAccessType === 'private'}
+                      onChange={(e) => setNewAccessType(e.target.value)}
+                    />
+                    <span>🔒 Private</span>
+                  </label>
+                </div>
                 <div className={styles.createActions}>
                   <button type="submit" className={styles.createSubmit}>
-                    Add
+                    Create
                   </button>
                   <button
                     type="button"
@@ -130,7 +232,7 @@ function Sidebar({
                 className={styles.addWhiteboardButton}
                 onClick={handleCreateClick}
               >
-                + New Whiteboard
+                + New Board
               </button>
             )}
           </div>
@@ -142,6 +244,16 @@ function Sidebar({
               disabled={disabled || !selectedWhiteboardId}
             >
               + New Note
+            </button>
+          </div>
+
+          <div className={styles.bottomSection}>
+            <button
+              className={styles.themeToggle}
+              onClick={onToggleDarkMode}
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>

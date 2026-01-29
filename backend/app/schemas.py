@@ -1,10 +1,65 @@
 """Pydantic schemas for request/response validation."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class AccessType(str, Enum):
+    """Whiteboard access type."""
+    PUBLIC = "public"
+    PRIVATE = "private"
+    SHARED = "shared"
+
+
+# ============================================================================
+# User/Auth Schemas
+# ============================================================================
+
+
+class UserBase(BaseModel):
+    """Base schema for user data."""
+
+    username: str = Field(
+        min_length=3,
+        max_length=50,
+        description="Unique username",
+    )
+
+
+class UserCreate(UserBase):
+    """Schema for creating a new user (registration)."""
+
+    password: str = Field(
+        min_length=4,
+        max_length=100,
+        description="User password",
+    )
+
+
+class UserResponse(UserBase):
+    """Schema for user response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID = Field(description="Unique identifier")
+    created_at: datetime = Field(description="Creation timestamp")
+
+
+class Token(BaseModel):
+    """Schema for JWT token response."""
+
+    access_token: str = Field(description="JWT access token")
+    token_type: str = Field(default="bearer", description="Token type")
+
+
+class TokenData(BaseModel):
+    """Schema for decoded token data."""
+
+    user_id: Optional[str] = None
 
 
 # ============================================================================
@@ -25,7 +80,14 @@ class WhiteboardBase(BaseModel):
 class WhiteboardCreate(WhiteboardBase):
     """Schema for creating a new whiteboard."""
 
-    pass
+    access_type: AccessType = Field(
+        default=AccessType.PUBLIC,
+        description="Access level: public, private, or shared",
+    )
+    shared_with: list[UUID] = Field(
+        default=[],
+        description="List of user IDs to share with (for shared access type)",
+    )
 
 
 class WhiteboardUpdate(BaseModel):
@@ -37,6 +99,23 @@ class WhiteboardUpdate(BaseModel):
         max_length=255,
         description="Whiteboard name",
     )
+    access_type: Optional[AccessType] = Field(
+        default=None,
+        description="Access level: public, private, or shared",
+    )
+    shared_with: Optional[list[UUID]] = Field(
+        default=None,
+        description="List of user IDs to share with (for shared access type)",
+    )
+
+
+class SharedUserResponse(BaseModel):
+    """Schema for a user with shared access."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID = Field(description="User ID")
+    username: str = Field(description="Username")
 
 
 class WhiteboardResponse(WhiteboardBase):
@@ -45,14 +124,31 @@ class WhiteboardResponse(WhiteboardBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(description="Unique identifier")
+    owner_id: UUID = Field(description="Owner user ID")
+    access_type: AccessType = Field(description="Access level")
+    shared_with: list[SharedUserResponse] = Field(
+        default=[],
+        description="Users with shared access",
+    )
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
+
+    @property
+    def is_private(self) -> bool:
+        """Backward compatibility."""
+        return self.access_type == AccessType.PRIVATE
+
+
+class WhiteboardWithOwnerResponse(WhiteboardResponse):
+    """Schema for whiteboard response including owner info."""
+
+    owner_username: str = Field(description="Owner username")
 
 
 class WhiteboardListResponse(BaseModel):
     """Schema for listing multiple whiteboards."""
 
-    whiteboards: list[WhiteboardResponse]
+    whiteboards: list[WhiteboardWithOwnerResponse]
     total: int = Field(description="Total number of whiteboards")
 
 

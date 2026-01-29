@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # CORS settings
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # JWT settings
+    secret_key: str = "change-me-in-production-use-a-long-random-string"
+
+    # NATS settings
+    nats_url: str = "nats://nats:4222"
+
     @property
     def async_database_url(self) -> str:
         """Get the async database URL for SQLAlchemy."""

@@ -1,14 +1,65 @@
 """SQLAlchemy models for the Todo Whiteboard application."""
 
+import enum
 from datetime import datetime
 from typing import Optional
 import uuid
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+class AccessType(str, enum.Enum):
+    """Whiteboard access type."""
+    PUBLIC = "public"
+    PRIVATE = "private"
+    SHARED = "shared"
+
+
+class User(Base):
+    """
+    User model for authentication.
+
+    Attributes:
+        id: Unique identifier (UUID)
+        username: Unique username
+        password_hash: Hashed password
+        created_at: Timestamp when the user was created
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    username: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Relationship to whiteboards
+    whiteboards: Mapped[list["Whiteboard"]] = relationship(
+        "Whiteboard", back_populates="owner", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, username='{self.username}')>"
 
 
 class Whiteboard(Base):
@@ -18,6 +69,8 @@ class Whiteboard(Base):
     Attributes:
         id: Unique identifier (UUID)
         name: Whiteboard name
+        owner_id: Foreign key to the user who owns this whiteboard
+        access_type: Access level (public, private, shared)
         created_at: Timestamp when the whiteboard was created
         updated_at: Timestamp when the whiteboard was last updated
     """
@@ -33,6 +86,17 @@ class Whiteboard(Base):
         String(255),
         nullable=False,
     )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    access_type: Mapped[AccessType] = mapped_column(
+        Enum(AccessType),
+        nullable=False,
+        default=AccessType.PUBLIC,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -45,10 +109,19 @@ class Whiteboard(Base):
         nullable=False,
     )
 
-    # Relationship to notes
+    # Relationships
+    owner: Mapped["User"] = relationship("User", back_populates="whiteboards")
     notes: Mapped[list["Note"]] = relationship(
         "Note", back_populates="whiteboard", cascade="all, delete-orphan"
     )
+    shared_with: Mapped[list["WhiteboardShare"]] = relationship(
+        "WhiteboardShare", back_populates="whiteboard", cascade="all, delete-orphan"
+    )
+
+    @property
+    def is_private(self) -> bool:
+        """Backward compatibility property."""
+        return self.access_type == AccessType.PRIVATE
 
     def __repr__(self) -> str:
         return f"<Whiteboard(id={self.id}, name='{self.name}')>"
@@ -96,7 +169,7 @@ class Note(Base):
     color: Mapped[str] = mapped_column(
         String(7),
         nullable=False,
-        default="#FFEB3B",  # Default yellow post-it color
+        default="#FFEB3B",
     )
     x_position: Mapped[float] = mapped_column(
         Float,
@@ -125,3 +198,47 @@ class Note(Base):
 
     def __repr__(self) -> str:
         return f"<Note(id={self.id}, title='{self.title}')>"
+
+
+class WhiteboardShare(Base):
+    """
+    WhiteboardShare model for granting specific users access to a whiteboard.
+
+    Attributes:
+        id: Unique identifier (UUID)
+        whiteboard_id: Foreign key to the whiteboard
+        user_id: Foreign key to the user who has access
+        created_at: Timestamp when the share was created
+    """
+
+    __tablename__ = "whiteboard_shares"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    whiteboard_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("whiteboards.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    whiteboard: Mapped["Whiteboard"] = relationship("Whiteboard", back_populates="shared_with")
+    user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<WhiteboardShare(whiteboard_id={self.whiteboard_id}, user_id={self.user_id})>"

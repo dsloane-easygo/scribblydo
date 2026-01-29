@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useContext } from 'react';
+import { useAuth } from './useAuth';
+import { WebSocketContext } from '../context/WebSocketContext';
 
 const API_BASE = '/api';
 
@@ -7,10 +9,59 @@ const API_BASE = '/api';
  * Provides CRUD operations with optimistic updates and error handling
  */
 export function useNotes(whiteboardId) {
+  const { getAuthHeaders, user } = useAuth();
+  const ws = useContext(WebSocketContext);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const abortControllerRef = useRef(null);
+
+  // Subscribe to real-time note events
+  useEffect(() => {
+    if (!ws || !whiteboardId) return;
+
+    const handleNoteCreated = (payload) => {
+      // Don't add if it was created by current user (already added optimistically)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const note = payload.note;
+      setNotes((prev) => {
+        // Check if note already exists
+        if (prev.some((n) => n.id === note.id)) return prev;
+        return [...prev, note];
+      });
+    };
+
+    const handleNoteUpdated = (payload) => {
+      // Don't update if it was by current user (already updated optimistically)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const note = payload.note;
+      setNotes((prev) =>
+        prev.map((n) => (n.id === note.id ? note : n))
+      );
+    };
+
+    const handleNoteDeleted = (payload) => {
+      // Don't delete if it was by current user (already deleted optimistically)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const noteId = payload.note?.id;
+      if (noteId) {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+    };
+
+    const unsubscribeCreated = ws.subscribe('note_created', handleNoteCreated);
+    const unsubscribeUpdated = ws.subscribe('note_updated', handleNoteUpdated);
+    const unsubscribeDeleted = ws.subscribe('note_deleted', handleNoteDeleted);
+
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+    };
+  }, [ws, whiteboardId, user]);
 
   // Fetch notes for the current whiteboard
   const fetchNotes = useCallback(async () => {
@@ -34,6 +85,9 @@ export function useNotes(whiteboardId) {
         `${API_BASE}/notes?whiteboard_id=${whiteboardId}`,
         {
           signal: abortControllerRef.current.signal,
+          headers: {
+            ...getAuthHeaders(),
+          },
         }
       );
 
@@ -52,7 +106,7 @@ export function useNotes(whiteboardId) {
     } finally {
       setLoading(false);
     }
-  }, [whiteboardId]);
+  }, [whiteboardId, getAuthHeaders]);
 
   // Fetch when whiteboard changes
   useEffect(() => {
@@ -90,6 +144,7 @@ export function useNotes(whiteboardId) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           whiteboard_id: whiteboardId,
@@ -119,7 +174,7 @@ export function useNotes(whiteboardId) {
       setNotes((prev) => prev.filter((note) => note.id !== tempId));
       throw err;
     }
-  }, [whiteboardId]);
+  }, [whiteboardId, getAuthHeaders]);
 
   // Update an existing note
   const updateNote = useCallback(async (id, updates) => {
@@ -142,6 +197,7 @@ export function useNotes(whiteboardId) {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(updates),
       });
@@ -168,7 +224,7 @@ export function useNotes(whiteboardId) {
       }
       throw err;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   // Delete a note
   const deleteNote = useCallback(async (id) => {
@@ -188,6 +244,9 @@ export function useNotes(whiteboardId) {
     try {
       const response = await fetch(`${API_BASE}/notes/${id}`, {
         method: 'DELETE',
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
 
       if (!response.ok) {
@@ -205,7 +264,7 @@ export function useNotes(whiteboardId) {
       }
       throw err;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   // Debounced position update for drag operations
   const updateNotePosition = useCallback(

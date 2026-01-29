@@ -31,11 +31,11 @@ patches:
       name: todo-app-config
     patch: |
       - op: replace
-        path: /data/ENVIRONMENT
-        value: local
+        path: /data/DEBUG
+        value: "true"
       - op: replace
-        path: /data/LOG_LEVEL
-        value: DEBUG
+        path: /data/DB_NAME
+        value: tododb
 
   # Patch Secret for local environment
   - target:
@@ -51,6 +51,7 @@ patches:
       - op: replace
         path: /stringData/POSTGRES_DB
         value: tododb
+
   # Patch frontend service to NodePort for local access
   - target:
       kind: Service
@@ -70,10 +71,7 @@ patches:
     patch: |
       - op: replace
         path: /spec/rules/0/host
-        value: todo.vc.local
-      - op: add
-        path: /metadata/annotations/nginx.ingress.kubernetes.io~1rewrite-target
-        value: /
+        value: todo.local
 
   # Reduce replicas for local development
   - target:

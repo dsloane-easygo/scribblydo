@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useContext } from 'react';
+import { useAuth } from './useAuth';
+import { WebSocketContext } from '../context/WebSocketContext';
 
 const API_BASE = '/api';
 
@@ -6,11 +8,69 @@ const API_BASE = '/api';
  * Custom hook for managing whiteboards state and API integration
  */
 export function useWhiteboards() {
+  const { getAuthHeaders, user } = useAuth();
+  const ws = useContext(WebSocketContext);
   const [whiteboards, setWhiteboards] = useState([]);
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const abortControllerRef = useRef(null);
+
+  // Subscribe to real-time whiteboard events
+  useEffect(() => {
+    if (!ws) return;
+
+    const handleWhiteboardCreated = (payload) => {
+      // Don't add if it was by current user (already added locally)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const whiteboard = payload.whiteboard;
+      setWhiteboards((prev) => {
+        // Check if already exists
+        if (prev.some((wb) => wb.id === whiteboard.id)) return prev;
+        return [whiteboard, ...prev];
+      });
+    };
+
+    const handleWhiteboardUpdated = (payload) => {
+      // Don't update if it was by current user (already updated locally)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const whiteboard = payload.whiteboard;
+      setWhiteboards((prev) =>
+        prev.map((wb) => (wb.id === whiteboard.id ? { ...wb, ...whiteboard } : wb))
+      );
+    };
+
+    const handleWhiteboardDeleted = (payload) => {
+      // Don't delete if it was by current user (already deleted locally)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const whiteboardId = payload.whiteboard?.id;
+      if (whiteboardId) {
+        setWhiteboards((prev) => {
+          const newList = prev.filter((wb) => wb.id !== whiteboardId);
+          // If we were viewing the deleted whiteboard, select another
+          if (selectedWhiteboardId === whiteboardId && newList.length > 0) {
+            setSelectedWhiteboardId(newList[0].id);
+          } else if (newList.length === 0) {
+            setSelectedWhiteboardId(null);
+          }
+          return newList;
+        });
+      }
+    };
+
+    const unsubscribeCreated = ws.subscribe('whiteboard_created', handleWhiteboardCreated);
+    const unsubscribeUpdated = ws.subscribe('whiteboard_updated', handleWhiteboardUpdated);
+    const unsubscribeDeleted = ws.subscribe('whiteboard_deleted', handleWhiteboardDeleted);
+
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+    };
+  }, [ws, user, selectedWhiteboardId]);
 
   // Fetch all whiteboards
   const fetchWhiteboards = useCallback(async () => {
@@ -25,6 +85,9 @@ export function useWhiteboards() {
 
       const response = await fetch(`${API_BASE}/whiteboards`, {
         signal: abortControllerRef.current.signal,
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
 
       if (!response.ok) {
@@ -47,7 +110,7 @@ export function useWhiteboards() {
     } finally {
       setLoading(false);
     }
-  }, [selectedWhiteboardId]);
+  }, [selectedWhiteboardId, getAuthHeaders]);
 
   // Initial fetch
   useEffect(() => {
@@ -61,14 +124,15 @@ export function useWhiteboards() {
   }, []);
 
   // Create a new whiteboard
-  const createWhiteboard = useCallback(async (name) => {
+  const createWhiteboard = useCallback(async (name, accessType = 'public', sharedWith = []) => {
     try {
       const response = await fetch(`${API_BASE}/whiteboards`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, access_type: accessType, shared_with: sharedWith }),
       });
 
       if (!response.ok) {
@@ -83,7 +147,7 @@ export function useWhiteboards() {
       console.error('Error creating whiteboard:', err);
       throw err;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   // Update a whiteboard
   const updateWhiteboard = useCallback(async (id, updates) => {
@@ -92,6 +156,7 @@ export function useWhiteboards() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(updates),
       });
@@ -109,13 +174,16 @@ export function useWhiteboards() {
       console.error('Error updating whiteboard:', err);
       throw err;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   // Delete a whiteboard
   const deleteWhiteboard = useCallback(async (id) => {
     try {
       const response = await fetch(`${API_BASE}/whiteboards/${id}`, {
         method: 'DELETE',
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
 
       if (!response.ok) {
@@ -136,10 +204,19 @@ export function useWhiteboards() {
       console.error('Error deleting whiteboard:', err);
       throw err;
     }
-  }, [selectedWhiteboardId]);
+  }, [selectedWhiteboardId, getAuthHeaders]);
 
   const selectedWhiteboard = whiteboards.find(
     (wb) => wb.id === selectedWhiteboardId
+  );
+
+  // Check if current user owns a whiteboard
+  const isOwner = useCallback(
+    (whiteboard) => {
+      if (!user || !whiteboard) return false;
+      return whiteboard.owner_id === user.id;
+    },
+    [user]
   );
 
   return {
@@ -153,6 +230,8 @@ export function useWhiteboards() {
     createWhiteboard,
     updateWhiteboard,
     deleteWhiteboard,
+    isOwner,
+    currentUserId: user?.id,
   };
 }
 

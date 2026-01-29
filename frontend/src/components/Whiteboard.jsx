@@ -1,6 +1,9 @@
-import React, { forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, { forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
 import PostItNote from './PostItNote';
+import CursorOverlay from './cursors/CursorOverlay';
+import ViewersOverlay from './presence/ViewersOverlay';
 import { useNotes } from '../hooks/useNotes';
+import { useCursors } from '../hooks/useCursors';
 import styles from '../styles/Whiteboard.module.css';
 
 // Colors for new notes
@@ -21,6 +24,18 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
     deleteNote,
     updateNotePosition,
   } = useNotes(whiteboardId);
+
+  const { remoteCursors, updateCursorPosition } = useCursors(whiteboardId);
+  const whiteboardRef = useRef(null);
+
+  // Handle mouse movement for cursor tracking
+  const handleMouseMove = useCallback((e) => {
+    if (!whiteboardRef.current) return;
+    const rect = whiteboardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    updateCursorPosition(x, y);
+  }, [updateCursorPosition]);
 
   const handleAddNote = useCallback(async () => {
     if (!whiteboardId) return;
@@ -81,8 +96,8 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
     return (
       <div className={styles.whiteboard}>
         <div className={styles.emptyState}>
-          <h2>No whiteboard selected</h2>
-          <p>Create a whiteboard to get started</p>
+          <h2>No board selected</h2>
+          <p>Create a board to get started</p>
         </div>
       </div>
     );
@@ -114,7 +129,13 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
   }
 
   return (
-    <div className={styles.whiteboard}>
+    <div
+      ref={whiteboardRef}
+      className={styles.whiteboard}
+      onMouseMove={handleMouseMove}
+    >
+      <ViewersOverlay />
+      <CursorOverlay cursors={remoteCursors} />
       <div className={styles.notesArea}>
         {notes.length === 0 && (
           <div className={styles.emptyState}>

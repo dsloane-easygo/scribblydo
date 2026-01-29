@@ -1,0 +1,75 @@
+.overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.viewersList {
+  display: flex;
+  align-items: center;
+}
+
+.viewerAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  border: 2px solid #fff;
+  margin-left: -8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.viewerAvatar:first-child {
+  margin-left: 0;
+}
+
+.overflowCount {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #666;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  border: 2px solid #fff;
+  margin-left: -8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.viewingLabel {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Dark mode */
+:global(.dark-mode) .viewerAvatar {
+  border-color: #1a1a1a;
+}
+
+:global(.dark-mode) .overflowCount {
+  background: #555;
+  border-color: #1a1a1a;
+}
+
+:global(.dark-mode) .viewingLabel {
+  color: #a0a0a0;
+}
