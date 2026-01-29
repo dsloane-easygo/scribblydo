@@ -1,0 +1,49 @@
+@startuml deployment
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam padding 6
+skinparam roundCorner 8
+
+title Scribblydo Deployment Architecture
+
+rectangle "Browser" as browser #E8EAF6 {
+    rectangle "Left Sidebar" as sidebar #C5CAE9 {
+        label "Whiteboards\n\n  - Board 1\n  - Board 2\n  + New Board\n\n  + New Note\n  Logout" as sidebar_content
+    }
+
+    rectangle "Whiteboard Area" as whiteboard #C5CAE9 {
+        card "Note" as note1 #FFF9C4
+        card "Note" as note2 #FFCDD2
+        card "Note" as note3 #C8E6C9
+        note right of note3 : cursor (User 2)
+    }
+
+    rectangle "Right Sidebar" as right_sidebar #C5CAE9 {
+        label "Online Users\n\n  - User 1 (you)\n  - User 2\n\nViewing Board\n\n  - User 2" as right_content
+    }
+}
+
+rectangle "Kubernetes Cluster" as k8s #E8F5E9 {
+    rectangle "Frontend\n(React+Nginx)\nPort: 80" as fe #A5D6A7
+    rectangle "Backend\n(FastAPI)\nPort: 8000" as be #A5D6A7
+    database "PostgreSQL\nPort: 5432" as pg #A5D6A7
+    queue "NATS\n(Messaging)\nPort: 4222" as nats #A5D6A7
+}
+
+' Layout
+sidebar -[hidden]r- whiteboard
+whiteboard -[hidden]r- right_sidebar
+
+fe -[hidden]r- be
+be -[hidden]r- pg
+
+' Connections
+browser -d-> fe : "HTTP"
+browser -d-> be : "WebSocket"
+fe -r-> be
+be -r-> pg
+be -d-> nats : "Pub/Sub"
+
+@enduml

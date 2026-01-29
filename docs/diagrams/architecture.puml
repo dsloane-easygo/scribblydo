@@ -1,0 +1,62 @@
+@startuml architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam padding 8
+skinparam roundCorner 8
+skinparam linetype ortho
+
+title Real-Time Collaboration Architecture
+
+package "Frontend" as frontend #E3F2FD {
+    together {
+        component "Auth\nContext" as auth_ctx #BBDEFB
+        component "WebSocket\nContext" as ws_ctx #BBDEFB
+        component "Presence\nContext" as presence_ctx #BBDEFB
+        component "Notification\nContext" as notif_ctx #BBDEFB
+    }
+
+    component "WebSocket\nConnection" as ws_conn #90CAF9
+    component "HTTP\nClient" as http_client #90CAF9
+}
+
+package "Backend" as backend #FFF3E0 {
+    component "/ws endpoint" as ws_endpoint #FFE0B2
+
+    component "Connection Manager" as conn_mgr #FFCC80 {
+        component "User connections\ntracking" as user_track #FFFFFF
+        component "Whiteboard viewer\ntracking" as wb_track #FFFFFF
+        component "In-memory\npub/sub" as pubsub #FFFFFF
+    }
+
+    component "REST APIs" as rest #FFE0B2
+    component "Broadcast\nEvents" as broadcast #FFE0B2
+    database "PostgreSQL" as db #FFE0B2
+}
+
+' Frontend connections
+auth_ctx -[hidden]r- ws_ctx
+ws_ctx -[hidden]r- presence_ctx
+presence_ctx -[hidden]r- notif_ctx
+
+' Auth provides state to other contexts
+auth_ctx ..> ws_ctx : provides\nauth state
+ws_ctx -d-> ws_conn
+presence_ctx -d-> ws_conn
+notif_ctx -d-> ws_conn
+
+' HTTP Client for REST calls
+http_client -d-> rest : HTTP
+
+' Frontend to Backend WebSocket
+ws_conn -d-> ws_endpoint : ws://
+
+' Backend connections
+ws_endpoint -d-> conn_mgr
+rest -d-> broadcast
+conn_mgr -d-> broadcast
+broadcast -d-> db
+
+@enduml
