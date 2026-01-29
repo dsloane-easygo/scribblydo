@@ -81,7 +81,7 @@ class TestConnectionManager:
         """Test connecting a user."""
         user_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -99,7 +99,7 @@ class TestConnectionManager:
         """Test disconnecting a user."""
         user_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -116,7 +116,7 @@ class TestConnectionManager:
         user_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -136,7 +136,7 @@ class TestConnectionManager:
         user_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -157,7 +157,7 @@ class TestConnectionManager:
         user_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -183,7 +183,7 @@ class TestConnectionManager:
         user2_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -212,7 +212,7 @@ class TestConnectionManager:
 
         user_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -236,7 +236,7 @@ class TestConnectionManager:
         ws2 = AsyncMock()
         ws2.send_json = AsyncMock()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -256,7 +256,7 @@ class TestConnectionManager:
         """Test getting list of online users."""
         user_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -275,7 +275,7 @@ class TestConnectionManager:
         user_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -303,7 +303,7 @@ class TestConnectionManager:
         user2_id = uuid4()
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -326,7 +326,7 @@ class TestConnectionManager:
         whiteboard_id = uuid4()
         other_whiteboard_id = uuid4()
 
-        with patch("app.websocket.connection_manager.nats_client") as mock_nats:
+        with patch("app.messaging.nats_client") as mock_nats:
             mock_nats.subscribe = AsyncMock()
             mock_nats.notifications_subject = MagicMock(return_value="notifications.test")
             mock_nats.presence_subject = MagicMock(return_value="presence.updates")
@@ -409,11 +409,11 @@ class TestWebSocketHandlers:
         """Test join whiteboard with access denied."""
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.handlers.async_session_factory") as mock_factory:
+        with patch("app.database.async_session_factory") as mock_factory:
             mock_session = AsyncMock()
             mock_factory.return_value.__aenter__.return_value = mock_session
 
-            with patch("app.websocket.handlers.has_whiteboard_read_access", return_value=False):
+            with patch("app.permissions.has_whiteboard_read_access", new_callable=AsyncMock, return_value=False):
                 await handle_join_whiteboard(mock_connection, {"whiteboard_id": str(whiteboard_id)})
 
         call_args = mock_connection.websocket.send_json.call_args[0][0]
@@ -425,11 +425,11 @@ class TestWebSocketHandlers:
         """Test successful whiteboard join."""
         whiteboard_id = uuid4()
 
-        with patch("app.websocket.handlers.async_session_factory") as mock_factory:
+        with patch("app.database.async_session_factory") as mock_factory:
             mock_session = AsyncMock()
             mock_factory.return_value.__aenter__.return_value = mock_session
 
-            with patch("app.websocket.handlers.has_whiteboard_read_access", return_value=True):
+            with patch("app.permissions.has_whiteboard_read_access", new_callable=AsyncMock, return_value=True):
                 with patch("app.websocket.handlers.manager") as mock_manager:
                     mock_manager.join_whiteboard = AsyncMock()
                     mock_manager.get_whiteboard_viewers = AsyncMock(return_value=[])
