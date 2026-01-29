@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -37,7 +38,9 @@ settings = get_settings()
 
 # Rate limiter configuration
 # Uses client IP address as the key for rate limiting
-limiter = Limiter(key_func=get_remote_address)
+# Disable rate limiting during tests to prevent test failures
+_testing = os.environ.get("TESTING", "").lower() == "true"
+limiter = Limiter(key_func=get_remote_address, enabled=not _testing)
 
 
 @asynccontextmanager

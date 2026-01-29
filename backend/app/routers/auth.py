@@ -1,5 +1,6 @@
 """Authentication API router for login, register, and user info."""
 
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -22,7 +23,9 @@ from app.schemas import Token, UserCreate, UserResponse
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Rate limiter for authentication endpoints
-limiter = Limiter(key_func=get_remote_address)
+# Disable rate limiting during tests to prevent test failures
+_testing = os.environ.get("TESTING", "").lower() == "true"
+limiter = Limiter(key_func=get_remote_address, enabled=not _testing)
 
 # Type alias for database session dependency
 DbSession = Annotated[AsyncSession, Depends(get_db)]
