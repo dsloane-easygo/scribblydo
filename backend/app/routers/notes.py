@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser
 from app.database import get_db
-from app.models import Note, PermissionLevel, User
+from app.models import Note, User
 from app.permissions import check_whiteboard_access
 from app.schemas import (
     NoteCreate,

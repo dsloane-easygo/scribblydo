@@ -105,7 +105,7 @@ jobs:
           DB_NAME: todo_whiteboard_test
           DB_USER: postgres
           DB_PASSWORD: postgres
-          SECRET_KEY: test-secret-key
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-chars
           NATS_URL: nats://localhost:4222
         run: |
           cd backend
