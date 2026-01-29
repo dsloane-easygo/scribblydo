@@ -14,12 +14,9 @@ export function PresenceProvider({ children }) {
 
   // Subscribe to presence updates
   useEffect(() => {
-    console.log('[PresenceContext] useEffect running, ws:', !!ws);
     if (!ws) return;
 
-    console.log('[PresenceContext] Subscribing to presence_update');
     const unsubscribePresence = ws.subscribe('presence_update', (payload) => {
-      console.log('[Presence] Received presence_update:', payload);
       setOnlineUsers(payload.online_users || []);
     });
 

@@ -121,6 +121,7 @@ export function useWhiteboards() {
         abortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Create a new whiteboard

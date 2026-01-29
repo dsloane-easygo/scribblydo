@@ -15,7 +15,7 @@ const ACCESS_ICONS = {
 function Sidebar({
   whiteboards,
   selectedWhiteboardId,
-  selectedWhiteboard,
+  selectedWhiteboard: _selectedWhiteboard,
   onSelectWhiteboard,
   onCreateWhiteboard,
   onUpdateWhiteboard,

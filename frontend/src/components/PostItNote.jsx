@@ -54,11 +54,12 @@ function PostItNote({ note, onUpdate, onDelete, onPositionChange, isSelected, on
     setLocalHeight(note.height || 180);
   }, [note.title, note.content, note.width, note.height]);
 
-  // Focus title input on new notes
+  // Focus title input on new notes (intentionally only on mount)
   useEffect(() => {
     if (!note.title && !note.content && titleInputRef.current) {
       titleInputRef.current.focus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced update for text changes

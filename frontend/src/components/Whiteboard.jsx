@@ -160,7 +160,7 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId, rightSidebarOp
         {notes.length === 0 && (
           <div className={styles.emptyState}>
             <h2>No notes yet!</h2>
-            <p>Click "New Note" in the sidebar to add your first post-it</p>
+            <p>Click &quot;New Note&quot; in the sidebar to add your first post-it</p>
           </div>
         )}
 

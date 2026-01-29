@@ -74,7 +74,7 @@ function Login({ onSwitchToRegister }) {
         </form>
 
         <p className={styles.switchText}>
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <button
             type="button"
             className={styles.switchButton}

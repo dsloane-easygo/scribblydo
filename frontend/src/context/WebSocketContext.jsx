@@ -13,7 +13,7 @@ const PING_INTERVAL = 30000;
  * Manages WebSocket connection for real-time collaboration
  */
 export function WebSocketProvider({ children }) {
-  const { token, isAuthenticated, user } = useContext(AuthContext);
+  const { token, isAuthenticated } = useContext(AuthContext);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
 
@@ -60,7 +60,6 @@ export function WebSocketProvider({ children }) {
         setIsConnected(true);
         setConnectionError(null);
         startPingInterval();
-        console.log('WebSocket authenticated');
         return;
       }
 
@@ -72,7 +71,6 @@ export function WebSocketProvider({ children }) {
 
       // Dispatch to subscribers
       const handlers = subscribersRef.current.get(type) || new Set();
-      console.log(`[WS] Received message type: ${type}, handlers: ${handlers.size}`, payload);
       handlers.forEach((handler) => {
         try {
           handler(payload);
@@ -98,7 +96,6 @@ export function WebSocketProvider({ children }) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected, authenticating...');
         // Send auth message
         ws.send(JSON.stringify({
           type: 'auth',
@@ -109,7 +106,6 @@ export function WebSocketProvider({ children }) {
       ws.onmessage = handleMessage;
 
       ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         isAuthenticatedRef.current = false;
         wsRef.current = null;
@@ -117,7 +113,6 @@ export function WebSocketProvider({ children }) {
         // Auto-reconnect if authenticated and not a clean close
         if (isAuthenticated && event.code !== 1000) {
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('Attempting to reconnect...');
             connect();
           }, RECONNECT_DELAY);
         }
@@ -161,7 +156,6 @@ export function WebSocketProvider({ children }) {
   // Send a message
   const send = useCallback((type, payload = {}) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected, cannot send:', type);
       return false;
     }
 
@@ -180,7 +174,6 @@ export function WebSocketProvider({ children }) {
       subscribersRef.current.set(type, new Set());
     }
     subscribersRef.current.get(type).add(handler);
-    console.log(`[WS] Subscribed to ${type}, total handlers: ${subscribersRef.current.get(type).size}`);
 
     // Return unsubscribe function
     return () => {
