@@ -711,6 +711,454 @@ class TestWhiteboardsRouterUnit:
         assert can_admin_whiteboard(whiteboard, user_id) is False
 
 
+class TestWhiteboardsRouterCRUD:
+    """Unit tests for whiteboards router CRUD operations."""
+
+    @pytest.mark.asyncio
+    async def test_create_whiteboard_with_shared_users(self):
+        """Test create_whiteboard with shared users."""
+        from app.routers.whiteboards import create_whiteboard
+        from app.schemas import ShareEntry, PermissionLevel as SchemaPermission
+
+        owner_id = uuid4()
+        shared_user_id = uuid4()
+
+        mock_owner = MagicMock(spec=User)
+        mock_owner.id = owner_id
+        mock_owner.username = "owner"
+
+        mock_shared_user = MagicMock(spec=User)
+        mock_shared_user.id = shared_user_id
+        mock_shared_user.username = "shared"
+
+        whiteboard_data = WhiteboardCreate(
+            name="Shared Board",
+            access_type="shared",
+            shared_with=[ShareEntry(user_id=shared_user_id, permission=SchemaPermission.WRITE)],
+        )
+
+        mock_db = AsyncMock()
+
+        # Mock user lookup for shared user
+        user_lookup_result = MagicMock()
+        user_lookup_result.scalar_one_or_none.return_value = mock_shared_user
+
+        # Mock the created whiteboard
+        created_wb = MagicMock(spec=Whiteboard)
+        created_wb.id = uuid4()
+        created_wb.name = "Shared Board"
+        created_wb.owner_id = owner_id
+        created_wb.owner = mock_owner
+        created_wb.access_type = AccessType.SHARED
+        created_wb.shared_with = []
+        created_wb.created_at = datetime.now(timezone.utc)
+        created_wb.updated_at = datetime.now(timezone.utc)
+
+        reload_result = MagicMock()
+        reload_result.scalar_one.return_value = created_wb
+
+        mock_db.execute.side_effect = [user_lookup_result, reload_result]
+
+        mock_background = MagicMock()
+
+        response = await create_whiteboard(whiteboard_data, mock_owner, mock_db, mock_background)
+
+        assert response.name == "Shared Board"
+
+    @pytest.mark.asyncio
+    async def test_get_whiteboard_not_found(self):
+        """Test get_whiteboard raises 404 for nonexistent whiteboard."""
+        from app.routers.whiteboards import get_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = uuid4()
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_whiteboard(whiteboard_id, mock_user, mock_db)
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_whiteboard_access_denied(self):
+        """Test get_whiteboard raises 403 for private whiteboard."""
+        from app.routers.whiteboards import get_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+        user_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = user_id
+
+        mock_owner = MagicMock(spec=User)
+        mock_owner.username = "owner"
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.owner = mock_owner
+        mock_whiteboard.access_type = AccessType.PRIVATE
+        mock_whiteboard.shared_with = []
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_whiteboard
+        mock_db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_whiteboard(whiteboard_id, mock_user, mock_db)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_update_whiteboard_not_found(self):
+        """Test update_whiteboard raises 404 for nonexistent whiteboard."""
+        from app.routers.whiteboards import update_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = uuid4()
+
+        update_data = WhiteboardUpdate(name="Updated")
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_whiteboard(whiteboard_id, update_data, mock_user, mock_db, mock_background)
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_update_whiteboard_access_denied(self):
+        """Test update_whiteboard raises 403 for non-admin user."""
+        from app.routers.whiteboards import update_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+        user_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = user_id
+
+        mock_owner = MagicMock(spec=User)
+        mock_owner.username = "owner"
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.owner = mock_owner
+        mock_whiteboard.access_type = AccessType.PUBLIC
+        mock_whiteboard.shared_with = []
+
+        update_data = WhiteboardUpdate(name="Updated")
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_whiteboard
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_whiteboard(whiteboard_id, update_data, mock_user, mock_db, mock_background)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_update_whiteboard_success(self):
+        """Test update_whiteboard updates whiteboard for owner."""
+        from app.routers.whiteboards import update_whiteboard
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = owner_id
+        mock_user.username = "owner"
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.name = "Original"
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.owner = mock_user
+        mock_whiteboard.access_type = AccessType.PUBLIC
+        mock_whiteboard.shared_with = []
+        mock_whiteboard.created_at = datetime.now(timezone.utc)
+        mock_whiteboard.updated_at = datetime.now(timezone.utc)
+
+        update_data = WhiteboardUpdate(name="Updated Name")
+
+        mock_db = AsyncMock()
+
+        # First call returns whiteboard for update check
+        first_result = MagicMock()
+        first_result.scalar_one_or_none.return_value = mock_whiteboard
+
+        # Update the mock whiteboard name
+        updated_wb = MagicMock(spec=Whiteboard)
+        updated_wb.id = whiteboard_id
+        updated_wb.name = "Updated Name"
+        updated_wb.owner_id = owner_id
+        updated_wb.owner = mock_user
+        updated_wb.access_type = AccessType.PUBLIC
+        updated_wb.shared_with = []
+        updated_wb.created_at = datetime.now(timezone.utc)
+        updated_wb.updated_at = datetime.now(timezone.utc)
+
+        # Second call returns updated whiteboard
+        second_result = MagicMock()
+        second_result.scalar_one.return_value = updated_wb
+
+        mock_db.execute.side_effect = [first_result, second_result]
+
+        mock_background = MagicMock()
+
+        response = await update_whiteboard(whiteboard_id, update_data, mock_user, mock_db, mock_background)
+
+        assert response.name == "Updated Name"
+
+    @pytest.mark.asyncio
+    async def test_delete_whiteboard_not_found(self):
+        """Test delete_whiteboard raises 404 for nonexistent whiteboard."""
+        from app.routers.whiteboards import delete_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = uuid4()
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_whiteboard(whiteboard_id, mock_user, mock_db, mock_background)
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_whiteboard_access_denied(self):
+        """Test delete_whiteboard raises 403 for non-admin user."""
+        from app.routers.whiteboards import delete_whiteboard
+        from fastapi import HTTPException
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+        user_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = user_id
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.access_type = AccessType.PUBLIC
+        mock_whiteboard.shared_with = []
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_whiteboard
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_whiteboard(whiteboard_id, mock_user, mock_db, mock_background)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_delete_whiteboard_success(self):
+        """Test delete_whiteboard deletes whiteboard for owner."""
+        from app.routers.whiteboards import delete_whiteboard
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = owner_id
+        mock_user.username = "owner"
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.access_type = AccessType.PRIVATE
+        mock_whiteboard.shared_with = []
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_whiteboard
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        await delete_whiteboard(whiteboard_id, mock_user, mock_db, mock_background)
+
+        mock_db.delete.assert_called_once_with(mock_whiteboard)
+
+    @pytest.mark.asyncio
+    async def test_delete_whiteboard_public_broadcasts(self):
+        """Test delete_whiteboard broadcasts for public whiteboard."""
+        from app.routers.whiteboards import delete_whiteboard
+
+        whiteboard_id = uuid4()
+        owner_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = owner_id
+        mock_user.username = "owner"
+
+        mock_whiteboard = MagicMock(spec=Whiteboard)
+        mock_whiteboard.id = whiteboard_id
+        mock_whiteboard.owner_id = owner_id
+        mock_whiteboard.access_type = AccessType.PUBLIC
+        mock_whiteboard.shared_with = []
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_whiteboard
+        mock_db.execute.return_value = mock_result
+
+        mock_background = MagicMock()
+
+        await delete_whiteboard(whiteboard_id, mock_user, mock_db, mock_background)
+
+        # Should add broadcast task for public whiteboard
+        mock_background.add_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_users_success(self):
+        """Test search_users returns matching users."""
+        from app.routers.whiteboards import search_users
+
+        user_id = uuid4()
+        other_user_id = uuid4()
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = user_id
+
+        mock_other_user = MagicMock(spec=User)
+        mock_other_user.id = other_user_id
+        mock_other_user.username = "otheruser"
+        mock_other_user.first_name = "Other"
+        mock_other_user.last_name = "User"
+        mock_other_user.created_at = datetime.now(timezone.utc)
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_other_user]
+        mock_db.execute.return_value = mock_result
+
+        response = await search_users("other", mock_user, mock_db)
+
+        assert len(response) == 1
+        assert response[0].username == "otheruser"
+
+    @pytest.mark.asyncio
+    async def test_search_users_short_query(self):
+        """Test search_users returns empty for short query."""
+        from app.routers.whiteboards import search_users
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = uuid4()
+
+        mock_db = AsyncMock()
+
+        response = await search_users("a", mock_user, mock_db)
+
+        assert response == []
+        mock_db.execute.assert_not_called()
+
+
+class TestWhiteboardsBroadcast:
+    """Tests for whiteboard broadcast functions."""
+
+    @pytest.mark.asyncio
+    async def test_broadcast_whiteboard_event_success(self):
+        """Test broadcast_whiteboard_event publishes to NATS."""
+        from app.routers.whiteboards import broadcast_whiteboard_event
+
+        whiteboard_id = uuid4()
+        event_type = "whiteboard_updated"
+        data = {"id": str(whiteboard_id), "name": "Test"}
+        by_user = {"id": str(uuid4()), "username": "testuser"}
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.publish_whiteboard_event = AsyncMock()
+
+            await broadcast_whiteboard_event(whiteboard_id, event_type, data, by_user)
+
+            mock_nats.publish_whiteboard_event.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_broadcast_whiteboard_event_handles_failure(self):
+        """Test broadcast_whiteboard_event logs warning on failure."""
+        from app.routers.whiteboards import broadcast_whiteboard_event
+
+        whiteboard_id = uuid4()
+        event_type = "whiteboard_updated"
+        data = {"id": str(whiteboard_id)}
+        by_user = {"id": str(uuid4()), "username": "testuser"}
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.publish_whiteboard_event = AsyncMock(side_effect=Exception("NATS error"))
+
+            # Should not raise
+            await broadcast_whiteboard_event(whiteboard_id, event_type, data, by_user)
+
+    @pytest.mark.asyncio
+    async def test_broadcast_global_whiteboard_event_success(self):
+        """Test broadcast_global_whiteboard_event publishes to NATS."""
+        from app.routers.whiteboards import broadcast_global_whiteboard_event
+
+        event_type = "whiteboard_created"
+        data = {"id": str(uuid4()), "name": "Test"}
+        by_user = {"id": str(uuid4()), "username": "testuser"}
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.publish = AsyncMock()
+
+            await broadcast_global_whiteboard_event(event_type, data, by_user)
+
+            mock_nats.publish.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_broadcast_global_whiteboard_event_handles_failure(self):
+        """Test broadcast_global_whiteboard_event logs warning on failure."""
+        from app.routers.whiteboards import broadcast_global_whiteboard_event
+
+        event_type = "whiteboard_deleted"
+        data = {"id": str(uuid4())}
+        by_user = {"id": str(uuid4()), "username": "testuser"}
+
+        with patch("app.messaging.nats_client") as mock_nats:
+            mock_nats.publish = AsyncMock(side_effect=Exception("NATS error"))
+
+            # Should not raise
+            await broadcast_global_whiteboard_event(event_type, data, by_user)
+
+
 class TestBroadcastNoteEvent:
     """Tests for broadcast_note_event function."""
 
