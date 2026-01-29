@@ -89,6 +89,7 @@ function MainApp() {
         <Whiteboard
           ref={whiteboardRef}
           whiteboardId={selectedWhiteboardId}
+          rightSidebarOpen={rightSidebarOpen}
         />
       </main>
       <RightSidebar

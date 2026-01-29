@@ -19,6 +19,13 @@ class AccessType(str, enum.Enum):
     SHARED = "shared"
 
 
+class PermissionLevel(str, enum.Enum):
+    """Permission level for shared whiteboard access."""
+    READ = "read"      # Can view whiteboard and notes
+    WRITE = "write"    # Can view, create, edit, and delete notes
+    ADMIN = "admin"    # Same as owner: can manage sharing, rename, delete whiteboard
+
+
 class User(Base):
     """
     User model for authentication.
@@ -46,6 +53,14 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+    )
+    first_name: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    last_name: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -93,7 +108,7 @@ class Whiteboard(Base):
         index=True,
     )
     access_type: Mapped[AccessType] = mapped_column(
-        Enum(AccessType),
+        Enum(AccessType, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=AccessType.PUBLIC,
     )
@@ -181,6 +196,16 @@ class Note(Base):
         nullable=False,
         default=0.0,
     )
+    width: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=200.0,
+    )
+    height: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=180.0,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -208,6 +233,7 @@ class WhiteboardShare(Base):
         id: Unique identifier (UUID)
         whiteboard_id: Foreign key to the whiteboard
         user_id: Foreign key to the user who has access
+        permission: Permission level (read, write, admin)
         created_at: Timestamp when the share was created
     """
 
@@ -230,6 +256,11 @@ class WhiteboardShare(Base):
         nullable=False,
         index=True,
     )
+    permission: Mapped[PermissionLevel] = mapped_column(
+        Enum(PermissionLevel, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=PermissionLevel.WRITE,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -241,4 +272,4 @@ class WhiteboardShare(Base):
     user: Mapped["User"] = relationship("User")
 
     def __repr__(self) -> str:
-        return f"<WhiteboardShare(whiteboard_id={self.whiteboard_id}, user_id={self.user_id})>"
+        return f"<WhiteboardShare(whiteboard_id={self.whiteboard_id}, user_id={self.user_id}, permission={self.permission})>"

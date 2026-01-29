@@ -17,6 +17,7 @@ async def handle_websocket_message(
         "join_whiteboard": handle_join_whiteboard,
         "leave_whiteboard": handle_leave_whiteboard,
         "cursor_move": handle_cursor_move,
+        "note_position": handle_note_position,
         "ping": handle_ping,
     }
 
@@ -99,6 +100,43 @@ async def handle_cursor_move(
         return  # Silently ignore invalid cursor data
 
     await manager.update_cursor(connection, x, y)
+
+
+async def handle_note_position(
+    connection: UserConnection, payload: Dict[str, Any]
+) -> None:
+    """Handle real-time note position streaming during drag."""
+    note_id = payload.get("note_id")
+    x_position = payload.get("x_position")
+    y_position = payload.get("y_position")
+
+    if not note_id or x_position is None or y_position is None:
+        return  # Silently ignore invalid position data
+
+    try:
+        x_position = float(x_position)
+        y_position = float(y_position)
+    except (TypeError, ValueError):
+        return  # Silently ignore invalid position data
+
+    # Broadcast to other viewers of the same whiteboard
+    if connection.current_whiteboard_id:
+        await manager.broadcast_to_whiteboard(
+            connection.current_whiteboard_id,
+            {
+                "type": "note_position",
+                "payload": {
+                    "note_id": note_id,
+                    "x_position": x_position,
+                    "y_position": y_position,
+                    "by_user": {
+                        "id": str(connection.user_id),
+                        "username": connection.username,
+                    },
+                },
+            },
+            exclude=connection,
+        )
 
 
 async def handle_ping(connection: UserConnection, payload: Dict[str, Any]) -> None:

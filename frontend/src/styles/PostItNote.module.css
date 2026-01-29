@@ -8,6 +8,10 @@
   z-index: 1000;
 }
 
+.noteWrapper.selected {
+  z-index: 100;
+}
+
 .note {
   width: 200px;
   min-height: 180px;
@@ -219,4 +223,91 @@
   .colorPicker {
     opacity: 1;
   }
+}
+
+/* Resize handles */
+.resizeHandle {
+  position: absolute;
+  background: transparent;
+  z-index: 20;
+}
+
+.resizeHandle:hover {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+/* Edge handles */
+.resizeN {
+  top: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: n-resize;
+}
+
+.resizeS {
+  bottom: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: s-resize;
+}
+
+.resizeE {
+  right: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor: e-resize;
+}
+
+.resizeW {
+  left: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor: w-resize;
+}
+
+/* Corner handles */
+.resizeNE {
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+  border-radius: 0 4px 0 0;
+}
+
+.resizeNW {
+  top: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+  border-radius: 4px 0 0 0;
+}
+
+.resizeSE {
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+  border-radius: 0 0 4px 0;
+}
+
+.resizeSW {
+  bottom: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
+  border-radius: 0 0 0 4px;
+}
+
+/* Selected state outline */
+.noteWrapper.selected .note {
+  outline: 2px solid rgba(59, 130, 246, 0.7);
+  outline-offset: 2px;
 }

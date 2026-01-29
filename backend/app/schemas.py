@@ -15,6 +15,13 @@ class AccessType(str, Enum):
     SHARED = "shared"
 
 
+class PermissionLevel(str, Enum):
+    """Permission level for shared whiteboard access."""
+    READ = "read"      # Can view whiteboard and notes
+    WRITE = "write"    # Can view, create, edit, and delete notes
+    ADMIN = "admin"    # Same as owner: can manage sharing, rename, delete whiteboard
+
+
 # ============================================================================
 # User/Auth Schemas
 # ============================================================================
@@ -38,6 +45,16 @@ class UserCreate(UserBase):
         max_length=100,
         description="User password",
     )
+    first_name: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="User's first name",
+    )
+    last_name: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="User's last name",
+    )
 
 
 class UserResponse(UserBase):
@@ -46,6 +63,8 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(description="Unique identifier")
+    first_name: Optional[str] = Field(default=None, description="User's first name")
+    last_name: Optional[str] = Field(default=None, description="User's last name")
     created_at: datetime = Field(description="Creation timestamp")
 
 
@@ -77,6 +96,16 @@ class WhiteboardBase(BaseModel):
     )
 
 
+class ShareEntry(BaseModel):
+    """Schema for sharing a whiteboard with a user."""
+
+    user_id: UUID = Field(description="User ID to share with")
+    permission: PermissionLevel = Field(
+        default=PermissionLevel.WRITE,
+        description="Permission level: read, write, or admin",
+    )
+
+
 class WhiteboardCreate(WhiteboardBase):
     """Schema for creating a new whiteboard."""
 
@@ -84,9 +113,9 @@ class WhiteboardCreate(WhiteboardBase):
         default=AccessType.PUBLIC,
         description="Access level: public, private, or shared",
     )
-    shared_with: list[UUID] = Field(
+    shared_with: list[ShareEntry] = Field(
         default=[],
-        description="List of user IDs to share with (for shared access type)",
+        description="List of users to share with and their permissions (for shared access type)",
     )
 
 
@@ -103,9 +132,9 @@ class WhiteboardUpdate(BaseModel):
         default=None,
         description="Access level: public, private, or shared",
     )
-    shared_with: Optional[list[UUID]] = Field(
+    shared_with: Optional[list[ShareEntry]] = Field(
         default=None,
-        description="List of user IDs to share with (for shared access type)",
+        description="List of users to share with and their permissions (for shared access type)",
     )
 
 
@@ -116,6 +145,7 @@ class SharedUserResponse(BaseModel):
 
     id: UUID = Field(description="User ID")
     username: str = Field(description="Username")
+    permission: PermissionLevel = Field(description="Permission level")
 
 
 class WhiteboardResponse(WhiteboardBase):
@@ -184,6 +214,18 @@ class NoteBase(BaseModel):
         ge=0.0,
         description="Y coordinate on the whiteboard",
     )
+    width: float = Field(
+        default=200.0,
+        ge=100.0,
+        le=800.0,
+        description="Width of the note in pixels",
+    )
+    height: float = Field(
+        default=180.0,
+        ge=100.0,
+        le=800.0,
+        description="Height of the note in pixels",
+    )
 
 
 class NoteCreate(NoteBase):
@@ -218,6 +260,18 @@ class NoteUpdate(BaseModel):
         default=None,
         ge=0.0,
         description="Y coordinate on the whiteboard",
+    )
+    width: Optional[float] = Field(
+        default=None,
+        ge=100.0,
+        le=800.0,
+        description="Width of the note in pixels",
+    )
+    height: Optional[float] = Field(
+        default=None,
+        ge=100.0,
+        le=800.0,
+        description="Height of the note in pixels",
     )
 
 

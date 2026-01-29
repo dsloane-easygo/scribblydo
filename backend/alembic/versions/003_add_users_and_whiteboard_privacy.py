@@ -57,6 +57,16 @@ def upgrade() -> None:
         """
     )
 
+    # Create test users with password 'test'
+    op.execute(
+        """
+        INSERT INTO users (id, username, password_hash)
+        VALUES
+            (gen_random_uuid(), 'damian.sloane', '$2b$12$ZhVJe226zMCilZQMuyzQPu9jkV1rlBG1WeqddPli.77POJYgxfO3m'),
+            (gen_random_uuid(), 'luke.mcwha', '$2b$12$ZhVJe226zMCilZQMuyzQPu9jkV1rlBG1WeqddPli.77POJYgxfO3m')
+        """
+    )
+
     # Add owner_id column to whiteboards (nullable first)
     op.add_column(
         "whiteboards",

@@ -7,7 +7,7 @@ import styles from '../../styles/ViewersOverlay.module.css';
  * ViewersOverlay Component
  * Shows viewers as circle avatars in the top-right of the whiteboard
  */
-export function ViewersOverlay() {
+export function ViewersOverlay({ rightSidebarOpen }) {
   const { whiteboardViewers } = usePresence();
   const { user } = useAuth();
 
@@ -23,7 +23,7 @@ export function ViewersOverlay() {
   const overflowCount = otherViewers.length - 5;
 
   return (
-    <div className={styles.overlay}>
+    <div className={`${styles.overlay} ${rightSidebarOpen ? styles.sidebarOpen : ''}`}>
       <div className={styles.viewersList}>
         {displayViewers.map((viewer, index) => (
           <div

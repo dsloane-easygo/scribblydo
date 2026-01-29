@@ -113,6 +113,7 @@ async def health_check() -> HealthResponse:
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc: Exception) -> JSONResponse:
     """Global exception handler for unhandled errors."""
+    logger.exception(f"Unhandled exception for {request.method} {request.url}: {exc}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An unexpected error occurred. Please try again later."},

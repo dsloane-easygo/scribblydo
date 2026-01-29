@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useCallback, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useCallback, useRef, useState } from 'react';
 import PostItNote from './PostItNote';
 import CursorOverlay from './cursors/CursorOverlay';
 import ViewersOverlay from './presence/ViewersOverlay';
@@ -13,7 +13,7 @@ const COLORS = ['#FFEB3B', '#FF7EB9', '#7AFCFF', '#98FB98', '#FFB347', '#DDA0DD'
  * Whiteboard Component
  * Main container for the note interface
  */
-const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
+const Whiteboard = forwardRef(function Whiteboard({ whiteboardId, rightSidebarOpen }, ref) {
   const {
     notes,
     loading,
@@ -23,10 +23,12 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
     updateNote,
     deleteNote,
     updateNotePosition,
+    streamNotePosition,
   } = useNotes(whiteboardId);
 
   const { remoteCursors, updateCursorPosition } = useCursors(whiteboardId);
   const whiteboardRef = useRef(null);
+  const [selectedNoteId, setSelectedNoteId] = useState(null);
 
   // Handle mouse movement for cursor tracking
   const handleMouseMove = useCallback((e) => {
@@ -84,13 +86,30 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
     }
   }, [deleteNote]);
 
-  const handlePositionChange = useCallback(async (id, x, y) => {
+  const handlePositionChange = useCallback(async (id, x, y, streaming = false) => {
     try {
-      await updateNotePosition(id, x, y);
+      if (streaming) {
+        // Stream position update in real-time (broadcast only, no DB save)
+        streamNotePosition(id, x, y);
+      } else {
+        // Final position update (save to DB)
+        await updateNotePosition(id, x, y);
+      }
     } catch (err) {
       console.error('Failed to update note position:', err);
     }
-  }, [updateNotePosition]);
+  }, [updateNotePosition, streamNotePosition]);
+
+  const handleSelectNote = useCallback((id) => {
+    setSelectedNoteId(id);
+  }, []);
+
+  const handleWhiteboardClick = useCallback((e) => {
+    // Deselect note when clicking on whiteboard background
+    if (e.target === whiteboardRef.current || e.target.classList.contains(styles.notesArea)) {
+      setSelectedNoteId(null);
+    }
+  }, []);
 
   if (!whiteboardId) {
     return (
@@ -133,8 +152,9 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
       ref={whiteboardRef}
       className={styles.whiteboard}
       onMouseMove={handleMouseMove}
+      onClick={handleWhiteboardClick}
     >
-      <ViewersOverlay />
+      <ViewersOverlay rightSidebarOpen={rightSidebarOpen} />
       <CursorOverlay cursors={remoteCursors} />
       <div className={styles.notesArea}>
         {notes.length === 0 && (
@@ -151,6 +171,8 @@ const Whiteboard = forwardRef(function Whiteboard({ whiteboardId }, ref) {
             onUpdate={handleUpdateNote}
             onDelete={handleDeleteNote}
             onPositionChange={handlePositionChange}
+            isSelected={selectedNoteId === note.id}
+            onSelect={handleSelectNote}
           />
         ))}
       </div>

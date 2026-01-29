@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import styles from '../styles/Sidebar.module.css';
+import logo from '../../assets/logo.png';
 
 const ACCESS_ICONS = {
   public: '🌐',
@@ -110,17 +111,18 @@ function Sidebar({
 
       {!isCollapsed && (
         <div className={styles.content}>
+          <div className={styles.logoSection}>
+            <img src={logo} alt="ScribblyDo" className={styles.logo} />
+          </div>
+
           <div className={styles.userSection}>
             <div className={styles.userInfo}>
-              <span className={styles.userName}>{currentUser?.username}</span>
+              <span className={styles.userName}>
+                {currentUser?.first_name && currentUser?.last_name
+                  ? `${currentUser.first_name} ${currentUser.last_name}`
+                  : currentUser?.username}
+              </span>
             </div>
-            <button
-              className={styles.logoutButton}
-              onClick={onLogout}
-              title="Sign out"
-            >
-              Sign Out
-            </button>
           </div>
 
           <div className={styles.section}>
@@ -254,6 +256,26 @@ function Sidebar({
               title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {darkMode ? '☀️' : '🌙'}
+            </button>
+            <button
+              className={styles.logoutButton}
+              onClick={onLogout}
+              title="Sign out"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
             </button>
           </div>
         </div>

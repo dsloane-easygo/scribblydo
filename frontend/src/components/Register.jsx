@@ -11,6 +11,8 @@ import styles from '../styles/Auth.module.css';
 function Register({ onSwitchToLogin }) {
   const { register } = useAuth();
   const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -39,14 +41,14 @@ function Register({ onSwitchToLogin }) {
       setLoading(true);
 
       try {
-        await register(username, password);
+        await register(username, password, firstName, lastName);
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     },
-    [username, password, confirmPassword, register]
+    [username, password, confirmPassword, firstName, lastName, register]
   );
 
   return (
@@ -58,6 +60,35 @@ function Register({ onSwitchToLogin }) {
         {error && <div className={styles.error}>{error}</div>}
 
         <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label htmlFor="firstName">First Name</label>
+              <input
+                id="firstName"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                maxLength={100}
+                autoComplete="given-name"
+                autoFocus
+                disabled={loading}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="lastName">Last Name</label>
+              <input
+                id="lastName"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                maxLength={100}
+                autoComplete="family-name"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
           <div className={styles.formGroup}>
             <label htmlFor="username">Username</label>
             <input
@@ -69,7 +100,6 @@ function Register({ onSwitchToLogin }) {
               minLength={3}
               maxLength={50}
               autoComplete="username"
-              autoFocus
               disabled={loading}
             />
           </div>

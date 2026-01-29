@@ -77,13 +77,18 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Register function
-  const register = useCallback(async (username, password) => {
+  const register = useCallback(async (username, password, firstName, lastName) => {
     const response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({
+        username,
+        password,
+        first_name: firstName || null,
+        last_name: lastName || null,
+      }),
     });
 
     if (!response.ok) {

@@ -58,6 +58,8 @@ async def register(user_data: UserCreate, db: DbSession) -> UserResponse:
     user = User(
         username=user_data.username,
         password_hash=get_password_hash(user_data.password),
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
     )
     db.add(user)
     await db.flush()

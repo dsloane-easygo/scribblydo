@@ -7,6 +7,11 @@
   gap: 8px;
   z-index: 100;
   pointer-events: none;
+  transition: right 0.3s ease;
+}
+
+.overlay.sidebarOpen {
+  right: 300px;
 }
 
 .viewersList {

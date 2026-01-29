@@ -62,6 +62,15 @@
   gap: 16px;
 }
 
+.formRow {
+  display: flex;
+  gap: 12px;
+}
+
+.formRow .formGroup {
+  flex: 1;
+}
+
 .formGroup {
   display: flex;
   flex-direction: column;

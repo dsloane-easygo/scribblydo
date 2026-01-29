@@ -52,14 +52,31 @@ export function useNotes(whiteboardId) {
       }
     };
 
+    // Handle real-time position streaming during drag
+    const handleNotePosition = (payload) => {
+      // Don't update if it was by current user (already updated locally)
+      if (user && payload.by_user?.id === user.id) return;
+
+      const { note_id, x_position, y_position } = payload;
+      if (note_id) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === note_id ? { ...n, x_position, y_position } : n
+          )
+        );
+      }
+    };
+
     const unsubscribeCreated = ws.subscribe('note_created', handleNoteCreated);
     const unsubscribeUpdated = ws.subscribe('note_updated', handleNoteUpdated);
     const unsubscribeDeleted = ws.subscribe('note_deleted', handleNoteDeleted);
+    const unsubscribePosition = ws.subscribe('note_position', handleNotePosition);
 
     return () => {
       unsubscribeCreated();
       unsubscribeUpdated();
       unsubscribeDeleted();
+      unsubscribePosition();
     };
   }, [ws, whiteboardId, user]);
 
@@ -280,6 +297,29 @@ export function useNotes(whiteboardId) {
     [updateNote]
   );
 
+  // Stream position update during drag (real-time broadcast without DB save)
+  const streamNotePosition = useCallback(
+    (id, x_position, y_position) => {
+      // Update local state immediately for smooth dragging
+      setNotes((prev) =>
+        prev.map((note) =>
+          note.id === id ? { ...note, x_position, y_position } : note
+        )
+      );
+
+      // Broadcast position via WebSocket for real-time collaboration
+      if (ws) {
+        ws.send('note_position', {
+          whiteboard_id: whiteboardId,
+          note_id: id,
+          x_position,
+          y_position,
+        });
+      }
+    },
+    [ws, whiteboardId]
+  );
+
   return {
     notes,
     loading,
@@ -289,6 +329,7 @@ export function useNotes(whiteboardId) {
     updateNote,
     deleteNote,
     updateNotePosition,
+    streamNotePosition,
   };
 }
 

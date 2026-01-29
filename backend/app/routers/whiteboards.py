@@ -11,10 +11,12 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import CurrentUser
 from app.database import get_db
-from app.models import AccessType, User, Whiteboard, WhiteboardShare
+from app.models import AccessType, PermissionLevel, User, Whiteboard, WhiteboardShare
 from app.schemas import (
     AccessType as SchemaAccessType,
+    PermissionLevel as SchemaPermissionLevel,
     SharedUserResponse,
+    UserResponse,
     WhiteboardCreate,
     WhiteboardListResponse,
     WhiteboardUpdate,
@@ -34,7 +36,11 @@ def whiteboard_to_response(whiteboard: Whiteboard) -> WhiteboardWithOwnerRespons
     shared_users = []
     if whiteboard.shared_with:
         shared_users = [
-            SharedUserResponse(id=share.user.id, username=share.user.username)
+            SharedUserResponse(
+                id=share.user.id,
+                username=share.user.username,
+                permission=SchemaPermissionLevel(share.permission.value),
+            )
             for share in whiteboard.shared_with
             if share.user
         ]
@@ -51,24 +57,41 @@ def whiteboard_to_response(whiteboard: Whiteboard) -> WhiteboardWithOwnerRespons
     )
 
 
-def can_access_whiteboard(whiteboard: Whiteboard, user_id: UUID) -> bool:
-    """Check if a user can access a whiteboard."""
-    # Owner always has access
+def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLevel | None:
+    """Get the user's permission level for a whiteboard."""
+    # Owner has implicit admin permission
     if whiteboard.owner_id == user_id:
-        return True
+        return PermissionLevel.ADMIN
 
-    # Public whiteboards are accessible to all
+    # Public whiteboards grant write access to everyone
     if whiteboard.access_type == AccessType.PUBLIC:
-        return True
+        return PermissionLevel.WRITE
 
-    # Shared whiteboards are accessible to shared users
+    # Check shared access
     if whiteboard.access_type == AccessType.SHARED:
         for share in whiteboard.shared_with:
             if share.user_id == user_id:
-                return True
+                return share.permission
 
-    # Private whiteboards are only accessible to owner
-    return False
+    # No access
+    return None
+
+
+def can_access_whiteboard(whiteboard: Whiteboard, user_id: UUID) -> bool:
+    """Check if a user can access a whiteboard (read access)."""
+    return get_user_permission(whiteboard, user_id) is not None
+
+
+def can_write_whiteboard(whiteboard: Whiteboard, user_id: UUID) -> bool:
+    """Check if a user can write to a whiteboard (create/edit/delete notes)."""
+    permission = get_user_permission(whiteboard, user_id)
+    return permission in (PermissionLevel.WRITE, PermissionLevel.ADMIN)
+
+
+def can_admin_whiteboard(whiteboard: Whiteboard, user_id: UUID) -> bool:
+    """Check if a user can administer a whiteboard (update settings, delete)."""
+    permission = get_user_permission(whiteboard, user_id)
+    return permission == PermissionLevel.ADMIN
 
 
 @router.get(
@@ -141,11 +164,15 @@ async def create_whiteboard(
 
     # Add shared users if access_type is SHARED
     if access_type == AccessType.SHARED and whiteboard_data.shared_with:
-        for user_id in whiteboard_data.shared_with:
+        for share_entry in whiteboard_data.shared_with:
             # Verify user exists
-            user_result = await db.execute(select(User).where(User.id == user_id))
+            user_result = await db.execute(select(User).where(User.id == share_entry.user_id))
             if user_result.scalar_one_or_none():
-                share = WhiteboardShare(whiteboard_id=whiteboard.id, user_id=user_id)
+                share = WhiteboardShare(
+                    whiteboard_id=whiteboard.id,
+                    user_id=share_entry.user_id,
+                    permission=PermissionLevel(share_entry.permission.value),
+                )
                 db.add(share)
 
     await db.flush()
@@ -226,9 +253,9 @@ async def get_whiteboard(
     "/{whiteboard_id}",
     response_model=WhiteboardWithOwnerResponse,
     summary="Update a whiteboard",
-    description="Update an existing whiteboard. Only the owner can update.",
+    description="Update an existing whiteboard. Only the owner or users with admin permission can update.",
     responses={
-        403: {"description": "Only the owner can update this whiteboard"},
+        403: {"description": "Admin permission required to update this whiteboard"},
         404: {"description": "Whiteboard not found"},
     },
 )
@@ -256,11 +283,11 @@ async def update_whiteboard(
             detail=f"Whiteboard with ID {whiteboard_id} not found",
         )
 
-    # Only owner can update
-    if whiteboard.owner_id != current_user.id:
+    # Check admin permission (owner or shared user with admin permission)
+    if not can_admin_whiteboard(whiteboard, current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can update this whiteboard",
+            detail="Admin permission required to update this whiteboard",
         )
 
     # Update fields
@@ -278,10 +305,14 @@ async def update_whiteboard(
 
         # Add new shares if access_type is SHARED
         if whiteboard.access_type == AccessType.SHARED:
-            for user_id in whiteboard_data.shared_with:
-                user_result = await db.execute(select(User).where(User.id == user_id))
+            for share_entry in whiteboard_data.shared_with:
+                user_result = await db.execute(select(User).where(User.id == share_entry.user_id))
                 if user_result.scalar_one_or_none():
-                    share = WhiteboardShare(whiteboard_id=whiteboard.id, user_id=user_id)
+                    share = WhiteboardShare(
+                        whiteboard_id=whiteboard.id,
+                        user_id=share_entry.user_id,
+                        permission=PermissionLevel(share_entry.permission.value),
+                    )
                     db.add(share)
 
     await db.flush()
@@ -360,9 +391,9 @@ async def broadcast_global_whiteboard_event(
     "/{whiteboard_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a whiteboard",
-    description="Permanently delete a whiteboard and all its notes. Only the owner can delete.",
+    description="Permanently delete a whiteboard and all its notes. Only the owner or users with admin permission can delete.",
     responses={
-        403: {"description": "Only the owner can delete this whiteboard"},
+        403: {"description": "Admin permission required to delete this whiteboard"},
         404: {"description": "Whiteboard not found"},
     },
 )
@@ -374,7 +405,9 @@ async def delete_whiteboard(
 ) -> None:
     """Delete a whiteboard."""
     result = await db.execute(
-        select(Whiteboard).where(Whiteboard.id == whiteboard_id)
+        select(Whiteboard)
+        .options(selectinload(Whiteboard.shared_with))
+        .where(Whiteboard.id == whiteboard_id)
     )
     whiteboard = result.scalar_one_or_none()
 
@@ -384,11 +417,11 @@ async def delete_whiteboard(
             detail=f"Whiteboard with ID {whiteboard_id} not found",
         )
 
-    # Only owner can delete
-    if whiteboard.owner_id != current_user.id:
+    # Check admin permission (owner or shared user with admin permission)
+    if not can_admin_whiteboard(whiteboard, current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can delete this whiteboard",
+            detail="Admin permission required to delete this whiteboard",
         )
 
     was_public = whiteboard.access_type == AccessType.PUBLIC
@@ -406,6 +439,7 @@ async def delete_whiteboard(
 
 @router.get(
     "/users/search",
+    response_model=list[UserResponse],
     summary="Search users for sharing",
     description="Search for users to share a whiteboard with.",
 )
@@ -413,7 +447,7 @@ async def search_users(
     q: str,
     current_user: CurrentUser,
     db: DbSession,
-) -> list[SharedUserResponse]:
+) -> list[UserResponse]:
     """Search for users by username."""
     if len(q) < 2:
         return []
@@ -427,4 +461,4 @@ async def search_users(
         .limit(10)
     )
     users = result.scalars().all()
-    return [SharedUserResponse(id=u.id, username=u.username) for u in users]
+    return [UserResponse.model_validate(u) for u in users]

@@ -5,13 +5,13 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth import CurrentUser
 from app.database import get_db
-from app.models import Note, User, Whiteboard
+from app.models import AccessType, Note, PermissionLevel, User, Whiteboard, WhiteboardShare
 from app.schemas import (
     NoteCreate,
     NoteListResponse,
@@ -27,20 +27,50 @@ router = APIRouter(prefix="/api/notes", tags=["notes"])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
-async def check_whiteboard_access(
+def get_user_permission(whiteboard: Whiteboard, user_id: UUID) -> PermissionLevel | None:
+    """Get the user's permission level for a whiteboard."""
+    # Owner has implicit admin permission
+    if whiteboard.owner_id == user_id:
+        return PermissionLevel.ADMIN
+
+    # Public whiteboards grant write access to everyone
+    if whiteboard.access_type == AccessType.PUBLIC:
+        return PermissionLevel.WRITE
+
+    # Check shared access
+    if whiteboard.access_type == AccessType.SHARED:
+        for share in whiteboard.shared_with:
+            if share.user_id == user_id:
+                return share.permission
+
+    # No access
+    return None
+
+
+async def get_whiteboard_with_shares(
+    whiteboard_id: UUID,
+    db: AsyncSession,
+) -> Whiteboard | None:
+    """Get a whiteboard with its shares loaded."""
+    result = await db.execute(
+        select(Whiteboard)
+        .options(selectinload(Whiteboard.shared_with))
+        .where(Whiteboard.id == whiteboard_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def check_whiteboard_read_access(
     whiteboard_id: UUID,
     user: User,
     db: AsyncSession,
 ) -> Whiteboard:
     """
-    Check if user has access to the whiteboard.
+    Check if user has read access to the whiteboard.
 
     Returns the whiteboard if accessible, raises HTTPException otherwise.
     """
-    result = await db.execute(
-        select(Whiteboard).where(Whiteboard.id == whiteboard_id)
-    )
-    whiteboard = result.scalar_one_or_none()
+    whiteboard = await get_whiteboard_with_shares(whiteboard_id, db)
 
     if whiteboard is None:
         raise HTTPException(
@@ -48,11 +78,39 @@ async def check_whiteboard_access(
             detail=f"Whiteboard with ID {whiteboard_id} not found",
         )
 
-    # Check access: allow if public or user is owner
-    if whiteboard.is_private and whiteboard.owner_id != user.id:
+    permission = get_user_permission(whiteboard, user.id)
+    if permission is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to private whiteboard",
+            detail="Access denied to this whiteboard",
+        )
+
+    return whiteboard
+
+
+async def check_whiteboard_write_access(
+    whiteboard_id: UUID,
+    user: User,
+    db: AsyncSession,
+) -> Whiteboard:
+    """
+    Check if user has write access to the whiteboard.
+
+    Returns the whiteboard if accessible, raises HTTPException otherwise.
+    """
+    whiteboard = await get_whiteboard_with_shares(whiteboard_id, db)
+
+    if whiteboard is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Whiteboard with ID {whiteboard_id} not found",
+        )
+
+    permission = get_user_permission(whiteboard, user.id)
+    if permission not in (PermissionLevel.WRITE, PermissionLevel.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Write permission required for this operation",
         )
 
     return whiteboard
@@ -73,10 +131,10 @@ async def list_notes(
     List notes from a specific whiteboard.
 
     Returns notes sorted by creation date (newest first).
-    User must have access to the whiteboard.
+    User must have read access to the whiteboard.
     """
-    # Check whiteboard access
-    await check_whiteboard_access(whiteboard_id, current_user, db)
+    # Check whiteboard read access
+    await check_whiteboard_read_access(whiteboard_id, current_user, db)
 
     query = select(Note).where(Note.whiteboard_id == whiteboard_id).order_by(Note.created_at.desc())
 
@@ -93,7 +151,7 @@ async def list_notes(
     response_model=NoteResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new note",
-    description="Create a new post-it note on a whiteboard.",
+    description="Create a new post-it note on a whiteboard. Requires write permission.",
 )
 async def create_note(
     note_data: NoteCreate,
@@ -112,8 +170,8 @@ async def create_note(
     Returns:
         The created note with generated ID and timestamps.
     """
-    # Check whiteboard access
-    await check_whiteboard_access(note_data.whiteboard_id, current_user, db)
+    # Check whiteboard write access
+    await check_whiteboard_write_access(note_data.whiteboard_id, current_user, db)
 
     note = Note(**note_data.model_dump())
     db.add(note)
@@ -154,7 +212,7 @@ async def broadcast_note_event(
     summary="Get a note by ID",
     description="Retrieve a specific note by its unique identifier.",
     responses={
-        403: {"description": "Access denied to private whiteboard"},
+        403: {"description": "Access denied to whiteboard"},
         404: {"description": "Note not found"},
     },
 )
@@ -178,7 +236,7 @@ async def get_note(
         HTTPException: If the note is not found or access is denied.
     """
     result = await db.execute(
-        select(Note).options(selectinload(Note.whiteboard)).where(Note.id == note_id)
+        select(Note).where(Note.id == note_id)
     )
     note = result.scalar_one_or_none()
 
@@ -188,8 +246,8 @@ async def get_note(
             detail=f"Note with ID {note_id} not found",
         )
 
-    # Check whiteboard access
-    await check_whiteboard_access(note.whiteboard_id, current_user, db)
+    # Check whiteboard read access
+    await check_whiteboard_read_access(note.whiteboard_id, current_user, db)
 
     return NoteResponse.model_validate(note)
 
@@ -198,9 +256,9 @@ async def get_note(
     "/{note_id}",
     response_model=NoteResponse,
     summary="Update a note",
-    description="Update an existing note's properties including position. Any user with whiteboard access can update notes.",
+    description="Update an existing note's properties including position. Requires write permission.",
     responses={
-        403: {"description": "Access denied to private whiteboard"},
+        403: {"description": "Write permission required"},
         404: {"description": "Note not found"},
     },
 )
@@ -214,7 +272,7 @@ async def update_note(
     """
     Update a note.
 
-    Any user with access to the whiteboard can update notes (collaborative editing).
+    Any user with write permission to the whiteboard can update notes (collaborative editing).
 
     Args:
         note_id: The unique identifier of the note to update.
@@ -237,9 +295,9 @@ async def update_note(
             detail=f"Note with ID {note_id} not found",
         )
 
-    # Check whiteboard access (collaborative - anyone with access can modify)
+    # Check whiteboard write access
     whiteboard_id = note.whiteboard_id
-    await check_whiteboard_access(whiteboard_id, current_user, db)
+    await check_whiteboard_write_access(whiteboard_id, current_user, db)
 
     # Update only provided fields
     update_data = note_data.model_dump(exclude_unset=True)
@@ -267,9 +325,9 @@ async def update_note(
     "/{note_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a note",
-    description="Permanently delete a note from the whiteboard. Any user with whiteboard access can delete notes.",
+    description="Permanently delete a note from the whiteboard. Requires write permission.",
     responses={
-        403: {"description": "Access denied to private whiteboard"},
+        403: {"description": "Write permission required"},
         404: {"description": "Note not found"},
     },
 )
@@ -282,7 +340,7 @@ async def delete_note(
     """
     Delete a note.
 
-    Any user with access to the whiteboard can delete notes (collaborative editing).
+    Any user with write permission to the whiteboard can delete notes (collaborative editing).
 
     Args:
         note_id: The unique identifier of the note to delete.
@@ -301,9 +359,9 @@ async def delete_note(
             detail=f"Note with ID {note_id} not found",
         )
 
-    # Check whiteboard access (collaborative - anyone with access can delete)
+    # Check whiteboard write access
     whiteboard_id = note.whiteboard_id
-    await check_whiteboard_access(whiteboard_id, current_user, db)
+    await check_whiteboard_write_access(whiteboard_id, current_user, db)
 
     await db.delete(note)
 

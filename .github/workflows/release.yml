@@ -1,0 +1,474 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOCKER_REGISTRY: docker.io
+  DOCKER_IMAGE_BACKEND: dsloane/scribblydo-backend
+  DOCKER_IMAGE_FRONTEND: dsloane/scribblydo-frontend
+
+jobs:
+  validate:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Validate version format
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "Error: Version must be in format X.Y.Z or X.Y.Z-suffix"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version validated: $VERSION"
+
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build backend (cache only)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: |
+            ${{ env.DOCKER_IMAGE_BACKEND }}:${{ needs.validate.outputs.version }}
+            ${{ env.DOCKER_IMAGE_BACKEND }}:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE_BACKEND }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE_BACKEND }}:buildcache,mode=max
+
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build frontend (cache only)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: |
+            ${{ env.DOCKER_IMAGE_FRONTEND }}:${{ needs.validate.outputs.version }}
+            ${{ env.DOCKER_IMAGE_FRONTEND }}:latest
+          build-args: |
+            VITE_API_URL=/api
+            VITE_APP_NAME=ScribblyDo
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE_FRONTEND }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE_FRONTEND }}:buildcache,mode=max
+
+  push-images:
+    name: Push Images to Docker Hub
+    runs-on: ubuntu-latest
+    needs: [validate, build-backend, build-frontend]
+    outputs:
+      backend-digest: ${{ steps.backend.outputs.digest }}
+      frontend-digest: ${{ steps.frontend.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # These will be instant since layers are cached in registry
+      - name: Push backend
+        id: backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_BACKEND }}:${{ needs.validate.outputs.version }}
+            ${{ env.DOCKER_IMAGE_BACKEND }}:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE_BACKEND }}:buildcache
+
+      - name: Push frontend
+        id: frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_FRONTEND }}:${{ needs.validate.outputs.version }}
+            ${{ env.DOCKER_IMAGE_FRONTEND }}:latest
+          build-args: |
+            VITE_API_URL=/api
+            VITE_APP_NAME=ScribblyDo
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE_FRONTEND }}:buildcache
+
+  create-artifacts:
+    name: Create Release Artifacts
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend assets
+        run: |
+          cd frontend
+          npm ci --legacy-peer-deps
+          npm run build
+
+      - name: Create source archive
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          tar --exclude='node_modules' \
+              --exclude='__pycache__' \
+              --exclude='.git' \
+              --exclude='*.pyc' \
+              --exclude='.env*' \
+              --exclude='dist' \
+              --exclude='.pytest_cache' \
+              --exclude='.ruff_cache' \
+              -czvf scribblydo-${VERSION}-source.tar.gz \
+              backend frontend $([ -f README.md ] && echo README.md)
+
+      - name: Create frontend dist archive
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          cd frontend
+          tar -czvf ../scribblydo-frontend-${VERSION}-dist.tar.gz dist/
+
+      - name: Create Kubernetes manifests archive
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          mkdir -p k8s-manifests
+
+          cat > k8s-manifests/backend-deployment.yaml << 'EOF'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: scribblydo-backend
+            labels:
+              app: scribblydo
+              component: backend
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: scribblydo
+                component: backend
+            template:
+              metadata:
+                labels:
+                  app: scribblydo
+                  component: backend
+              spec:
+                containers:
+                - name: backend
+                  image: IMAGE_PLACEHOLDER
+                  ports:
+                  - containerPort: 8000
+                  env:
+                  - name: DATABASE_URL
+                    valueFrom:
+                      secretKeyRef:
+                        name: scribblydo-secrets
+                        key: database-url
+                  - name: SECRET_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: scribblydo-secrets
+                        key: secret-key
+                  - name: NATS_URL
+                    value: nats://nats:4222
+                  resources:
+                    requests:
+                      memory: "256Mi"
+                      cpu: "100m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+          EOF
+          sed -i "s|IMAGE_PLACEHOLDER|${{ env.DOCKER_IMAGE_BACKEND }}:${VERSION}|g" k8s-manifests/backend-deployment.yaml
+
+          cat > k8s-manifests/frontend-deployment.yaml << 'EOF'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: scribblydo-frontend
+            labels:
+              app: scribblydo
+              component: frontend
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: scribblydo
+                component: frontend
+            template:
+              metadata:
+                labels:
+                  app: scribblydo
+                  component: frontend
+              spec:
+                containers:
+                - name: frontend
+                  image: IMAGE_PLACEHOLDER
+                  ports:
+                  - containerPort: 80
+                  resources:
+                    requests:
+                      memory: "64Mi"
+                      cpu: "50m"
+                    limits:
+                      memory: "128Mi"
+                      cpu: "200m"
+          EOF
+          sed -i "s|IMAGE_PLACEHOLDER|${{ env.DOCKER_IMAGE_FRONTEND }}:${VERSION}|g" k8s-manifests/frontend-deployment.yaml
+
+          cat > k8s-manifests/services.yaml << 'EOF'
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: scribblydo-backend
+          spec:
+            selector:
+              app: scribblydo
+              component: backend
+            ports:
+            - port: 8000
+              targetPort: 8000
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: scribblydo-frontend
+          spec:
+            selector:
+              app: scribblydo
+              component: frontend
+            ports:
+            - port: 80
+              targetPort: 80
+          EOF
+
+          cat > k8s-manifests/nats-deployment.yaml << 'EOF'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nats
+            labels:
+              app: scribblydo
+              component: nats
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: scribblydo
+                component: nats
+            template:
+              metadata:
+                labels:
+                  app: scribblydo
+                  component: nats
+              spec:
+                containers:
+                - name: nats
+                  image: nats:2.10-alpine
+                  ports:
+                  - containerPort: 4222
+                  resources:
+                    requests:
+                      memory: "64Mi"
+                      cpu: "50m"
+                    limits:
+                      memory: "128Mi"
+                      cpu: "200m"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: nats
+          spec:
+            selector:
+              app: scribblydo
+              component: nats
+            ports:
+            - port: 4222
+              targetPort: 4222
+          EOF
+
+          tar -czvf scribblydo-${VERSION}-k8s-manifests.tar.gz k8s-manifests/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            scribblydo-*-source.tar.gz
+            scribblydo-*-dist.tar.gz
+            scribblydo-*-k8s-manifests.tar.gz
+          retention-days: 1
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, push-images, create-artifacts]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: Release v${{ needs.validate.outputs.version }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            artifacts/scribblydo-*-source.tar.gz
+            artifacts/scribblydo-*-dist.tar.gz
+            artifacts/scribblydo-*-k8s-manifests.tar.gz
+          body: |
+            ## Docker Images
+
+            This release publishes the following Docker images:
+
+            **Backend:**
+            ```bash
+            docker pull ${{ env.DOCKER_IMAGE_BACKEND }}:${{ needs.validate.outputs.version }}
+            ```
+
+            **Frontend:**
+            ```bash
+            docker pull ${{ env.DOCKER_IMAGE_FRONTEND }}:${{ needs.validate.outputs.version }}
+            ```
+
+            ## Quick Start
+
+            ### Using Docker Compose
+            ```yaml
+            services:
+              postgres:
+                image: postgres:16-alpine
+                environment:
+                  POSTGRES_USER: scribblydo
+                  POSTGRES_PASSWORD: scribblydo
+                  POSTGRES_DB: scribblydo
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+
+              nats:
+                image: nats:2.10-alpine
+
+              backend:
+                image: ${{ env.DOCKER_IMAGE_BACKEND }}:${{ needs.validate.outputs.version }}
+                ports:
+                  - "8000:8000"
+                environment:
+                  - DATABASE_URL=postgresql+asyncpg://scribblydo:scribblydo@postgres:5432/scribblydo
+                  - SECRET_KEY=your-secret-key
+                  - NATS_URL=nats://nats:4222
+                depends_on:
+                  - postgres
+                  - nats
+
+              frontend:
+                image: ${{ env.DOCKER_IMAGE_FRONTEND }}:${{ needs.validate.outputs.version }}
+                ports:
+                  - "80:80"
+
+            volumes:
+              postgres_data:
+            ```
+
+            ### Using Kubernetes
+            Download the `k8s-manifests.tar.gz` artifact and apply:
+            ```bash
+            tar -xzf scribblydo-${{ needs.validate.outputs.version }}-k8s-manifests.tar.gz
+            kubectl apply -f k8s-manifests/
+            ```
+
+            ## Artifacts
+
+            | Artifact | Description |
+            |----------|-------------|
+            | `scribblydo-${{ needs.validate.outputs.version }}-source.tar.gz` | Complete source code |
+            | `scribblydo-${{ needs.validate.outputs.version }}-dist.tar.gz` | Pre-built frontend assets |
+            | `scribblydo-${{ needs.validate.outputs.version }}-k8s-manifests.tar.gz` | Kubernetes deployment manifests |
+
+            ## Image Digests
+
+            - Backend: `${{ needs.push-images.outputs.backend-digest }}`
+            - Frontend: `${{ needs.push-images.outputs.frontend-digest }}`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
