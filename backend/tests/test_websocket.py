@@ -664,3 +664,17 @@ class TestWebSocketHandlers:
                 "y_position": "invalid",
             })
             mock_manager.broadcast_to_whiteboard.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handle_join_whiteboard_db_error(self, mock_connection):
+        """Test join whiteboard handles database errors gracefully."""
+        whiteboard_id = uuid4()
+
+        with patch("app.database.async_session_factory") as mock_factory:
+            mock_factory.return_value.__aenter__ = AsyncMock(side_effect=Exception("Database error"))
+
+            await handle_join_whiteboard(mock_connection, {"whiteboard_id": str(whiteboard_id)})
+
+        call_args = mock_connection.websocket.send_json.call_args[0][0]
+        assert call_args["type"] == "error"
+        assert call_args["payload"]["code"] == "internal_error"

@@ -30,6 +30,23 @@ class TestHealthCheck:
         assert data["database"] == "healthy"
         assert "version" in data
 
+    @pytest.mark.asyncio
+    async def test_health_check_degraded(self):
+        """Test health check returns degraded when database fails."""
+        from app.main import health_check
+
+        with patch("app.main.async_session_factory") as mock_factory:
+            mock_session = MagicMock()
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock()
+            mock_session.execute = AsyncMock(side_effect=Exception("DB connection failed"))
+            mock_factory.return_value = mock_session
+
+            response = await health_check()
+
+            assert response.status == "degraded"
+            assert "unhealthy" in response.database
+
 
 class TestGlobalExceptionHandler:
     """Tests for global exception handling."""
@@ -109,6 +126,61 @@ class TestWebSocketEndpoint:
                     response = websocket.receive_json()
                     assert response["type"] == "auth_success"
                     assert response["payload"]["username"] == test_user["username"]
+
+    @pytest.mark.asyncio
+    async def test_websocket_token_without_sub(self, client: AsyncClient):
+        """Test WebSocket auth with token missing sub claim."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        from jose import jwt
+        from app.auth import SECRET_KEY, ALGORITHM
+        from datetime import datetime, timezone, timedelta
+
+        # Create token without sub claim
+        token = jwt.encode(
+            {"exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+            SECRET_KEY,
+            algorithm=ALGORITHM,
+        )
+
+        with TestClient(app) as test_client:
+            with pytest.raises(Exception):  # WebSocket will close
+                with test_client.websocket_connect("/ws") as websocket:
+                    websocket.send_json({"type": "auth", "payload": {"token": token}})
+                    # Connection should close
+
+    @pytest.mark.asyncio
+    async def test_websocket_token_invalid_uuid(self, client: AsyncClient):
+        """Test WebSocket auth with token containing invalid UUID."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        from app.auth import create_access_token
+
+        # Create token with invalid UUID
+        token = create_access_token(data={"sub": "not-a-valid-uuid"})
+
+        with TestClient(app) as test_client:
+            with pytest.raises(Exception):  # WebSocket will close
+                with test_client.websocket_connect("/ws") as websocket:
+                    websocket.send_json({"type": "auth", "payload": {"token": token}})
+                    # Connection should close
+
+    @pytest.mark.asyncio
+    async def test_websocket_user_not_found(self, client: AsyncClient):
+        """Test WebSocket auth with token for non-existent user."""
+        from starlette.testclient import TestClient
+        from app.main import app
+        from app.auth import create_access_token
+        from uuid import uuid4
+
+        # Create token for user that doesn't exist
+        token = create_access_token(data={"sub": str(uuid4())})
+
+        with TestClient(app) as test_client:
+            with pytest.raises(Exception):  # WebSocket will close
+                with test_client.websocket_connect("/ws") as websocket:
+                    websocket.send_json({"type": "auth", "payload": {"token": token}})
+                    # Connection should close due to user not found
 
     @pytest.mark.asyncio
     async def test_websocket_ping_pong(self, client: AsyncClient, test_user: dict):

@@ -203,3 +203,41 @@ class TestAuthEndpoints:
 
 # Import datetime for the tests above
 from datetime import datetime, timezone
+
+
+class TestGetCurrentUserOptional:
+    """Tests for get_current_user_optional function."""
+
+    @pytest.mark.asyncio
+    async def test_returns_none_without_token(self):
+        """Test get_current_user_optional returns None without token."""
+        from app.auth import get_current_user_optional
+        from unittest.mock import AsyncMock
+
+        mock_db = AsyncMock()
+        result = await get_current_user_optional(None, mock_db)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_with_invalid_token(self):
+        """Test get_current_user_optional returns None with invalid token."""
+        from app.auth import get_current_user_optional
+        from unittest.mock import AsyncMock
+
+        mock_db = AsyncMock()
+        result = await get_current_user_optional("invalid.token.here", mock_db)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_with_expired_token(self):
+        """Test get_current_user_optional returns None with expired token."""
+        from app.auth import get_current_user_optional, create_access_token
+        from unittest.mock import AsyncMock
+
+        mock_db = AsyncMock()
+        token = create_access_token(
+            data={"sub": str(uuid4())},
+            expires_delta=timedelta(hours=-1),
+        )
+        result = await get_current_user_optional(token, mock_db)
+        assert result is None
