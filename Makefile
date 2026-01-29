@@ -11,6 +11,8 @@
 .PHONY: frontend-lint frontend-format frontend-clean
 .PHONY: status health docker-prune docker-prune-all quick-start
 .PHONY: k8s-build k8s-deploy-local k8s-deploy-aws k8s-delete k8s-status k8s-logs k8s-port-forward
+.PHONY: ci ci-lint ci-lint-backend ci-lint-frontend ci-test ci-test-backend
+.PHONY: ci-format ci-format-backend ci-format-frontend
 
 SHELL := /bin/bash
 
@@ -174,13 +176,13 @@ frontend-clean: ## Remove frontend build artifacts
 	rm -rf frontend/dist frontend/node_modules/.cache
 
 # =============================================================================
-# Code Quality
+# Code Quality (Local - requires tools installed)
 # =============================================================================
 
-lint: backend-lint frontend-lint ## Run linters on all code
+lint: backend-lint frontend-lint ## Run linters on all code (local)
 	@echo "${GREEN}Linting completed${RESET}"
 
-backend-lint: ## Lint backend code with ruff
+backend-lint: ## Lint backend code with ruff (local)
 	@echo "${GREEN}Linting backend...${RESET}"
 	@if command -v ruff > /dev/null; then \
 		ruff check backend/app/; \
@@ -202,6 +204,46 @@ backend-format: ## Format backend code with ruff
 frontend-format: ## Format frontend code with prettier
 	@echo "${GREEN}Formatting frontend...${RESET}"
 	cd frontend && npm run format 2>/dev/null || npx prettier --write "src/**/*.{js,jsx,css}" 2>/dev/null || echo "${YELLOW}prettier not installed${RESET}"
+
+# =============================================================================
+# CI Checks (Docker-based - matches GitHub Actions)
+# =============================================================================
+
+ci-lint: ci-lint-backend ci-lint-frontend ## Run all CI linting checks in Docker
+	@echo "${GREEN}All CI lint checks passed!${RESET}"
+
+ci-lint-backend: ## Lint backend with ruff in Docker (matches CI)
+	@echo "${GREEN}Running backend lint (ruff) in Docker...${RESET}"
+	@docker run --rm -v "$(PWD)/backend:/app" -w /app python:3.11-slim \
+		sh -c "pip install -q ruff && ruff check app/"
+
+ci-lint-frontend: ## Lint frontend with eslint in Docker (matches CI)
+	@echo "${GREEN}Running frontend lint (eslint) in Docker...${RESET}"
+	@docker run --rm -v "$(PWD)/frontend:/app" -w /app node:20-alpine \
+		sh -c "npm ci --legacy-peer-deps --silent && npm run lint"
+
+ci-test: ci-test-backend ## Run all CI tests in Docker
+	@echo "${GREEN}All CI tests passed!${RESET}"
+
+ci-test-backend: ## Run backend tests in Docker with services
+	@echo "${GREEN}Running backend tests in Docker...${RESET}"
+	cd backend && docker compose --profile test run --rm test
+
+ci-format-backend: ## Auto-fix backend lint issues with ruff in Docker
+	@echo "${GREEN}Formatting backend with ruff in Docker...${RESET}"
+	@docker run --rm -v "$(PWD)/backend:/app" -w /app python:3.11-slim \
+		sh -c "pip install -q ruff && ruff check --fix app/ && ruff format app/"
+
+ci-format-frontend: ## Auto-fix frontend lint issues with eslint in Docker
+	@echo "${GREEN}Formatting frontend with eslint in Docker...${RESET}"
+	@docker run --rm -v "$(PWD)/frontend:/app" -w /app node:20-alpine \
+		sh -c "npm ci --legacy-peer-deps --silent && npm run lint -- --fix || true"
+
+ci-format: ci-format-backend ci-format-frontend ## Auto-fix all lint issues in Docker
+	@echo "${GREEN}All formatting completed!${RESET}"
+
+ci: ci-lint ci-test ## Run full CI pipeline locally in Docker
+	@echo "${GREEN}Full CI pipeline passed!${RESET}"
 
 # =============================================================================
 # Status & Health

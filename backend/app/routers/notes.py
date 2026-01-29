@@ -1,7 +1,7 @@
 """Notes API router with CRUD operations."""
 
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import CurrentUser
 from app.database import get_db
-from app.models import AccessType, Note, PermissionLevel, User, Whiteboard, WhiteboardShare
+from app.models import AccessType, Note, PermissionLevel, User, Whiteboard
 from app.schemas import (
     NoteCreate,
     NoteListResponse,

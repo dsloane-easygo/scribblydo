@@ -1,22 +1,11 @@
 """FastAPI application entry point."""
 
-import json
 import logging
 import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    stream=sys.stdout,
-)
-# Reduce noise from libraries
-logging.getLogger("asyncio").setLevel(logging.WARNING)
-logging.getLogger("nats").setLevel(logging.INFO)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -28,6 +17,16 @@ from app.routers import auth, notes, whiteboards
 from app.schemas import ErrorResponse, HealthResponse
 from app.websocket import manager
 from app.websocket.handlers import handle_websocket_message
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+)
+# Reduce noise from libraries
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("nats").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 

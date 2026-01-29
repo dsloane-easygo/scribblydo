@@ -1,6 +1,8 @@
-# Todo Whiteboard
+# Scribblydo
 
-A modern, real-time collaborative whiteboard application featuring draggable post-it notes, live cursor tracking, and instant updates. Built with React and FastAPI, designed for cloud-native deployment on Kubernetes.
+A modern, real-time collaborative whiteboard application featuring draggable post-it notes, live 
+cursor tracking, and instant updates. Built with React and FastAPI, designed for cloud-native 
+deployment on Kubernetes.
 
 ## Features
 
