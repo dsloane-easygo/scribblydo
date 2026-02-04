@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# deploy-local-k8s.sh - Deploy Todo Whiteboard to Docker Desktop Kubernetes
+# deploy-local-k8s.sh - Deploy Scribblydo to Docker Desktop Kubernetes
 # -----------------------------------------------------------------------------
 set -eo pipefail
 
@@ -51,10 +51,10 @@ build_images() {
     cd "$PROJECT_ROOT"
 
     log_info "  Building backend image..."
-    docker build -t todo-backend:local ./backend
+    docker build -t scribblydo-backend:local ./backend
 
     log_info "  Building frontend image..."
-    docker build -t todo-frontend:local ./frontend
+    docker build -t scribblydo-frontend:local ./frontend
 
     log_info "  ✓ Images built successfully"
 }
@@ -73,19 +73,19 @@ deploy() {
     # Wait for postgres
     kubectl wait --for=condition=ready pod \
         -l app.kubernetes.io/name=postgres \
-        -n todo-app \
+        -n scribblydo \
         --timeout=120s || true
 
     # Wait for backend (may take longer due to init container)
     kubectl wait --for=condition=ready pod \
         -l app.kubernetes.io/name=backend \
-        -n todo-app \
+        -n scribblydo \
         --timeout=180s || true
 
     # Wait for frontend
     kubectl wait --for=condition=ready pod \
         -l app.kubernetes.io/name=frontend \
-        -n todo-app \
+        -n scribblydo \
         --timeout=120s || true
 
     log_info "  ✓ Deployment complete"
@@ -96,21 +96,21 @@ show_status() {
     echo ""
     log_info "Deployment Status:"
     echo ""
-    kubectl get pods -n todo-app
+    kubectl get pods -n scribblydo
     echo ""
-    kubectl get svc -n todo-app
+    kubectl get svc -n scribblydo
     echo ""
 
     log_info "============================================"
-    log_info "  Todo Whiteboard deployed successfully!"
+    log_info "  Scribblydo deployed successfully!"
     log_info "============================================"
     echo ""
     log_info "Access the application:"
     log_info "  • NodePort: http://localhost:30080"
-    log_info "  • Port Forward: kubectl port-forward -n todo-app svc/frontend-service 8080:80"
+    log_info "  • Port Forward: kubectl port-forward -n scribblydo svc/frontend-service 8080:80"
     echo ""
     log_info "Useful commands:"
-    log_info "  • View logs: kubectl logs -n todo-app -l app.kubernetes.io/name=backend"
+    log_info "  • View logs: kubectl logs -n scribblydo -l app.kubernetes.io/name=backend"
     log_info "  • Delete: kubectl delete -k k8s/overlays/local"
     echo ""
 }
@@ -119,7 +119,7 @@ show_status() {
 main() {
     echo ""
     log_info "============================================"
-    log_info "  Todo Whiteboard - Local K8s Deployment"
+    log_info "  Scribblydo - Local K8s Deployment"
     log_info "============================================"
     echo ""
 

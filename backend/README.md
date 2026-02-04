@@ -1,4 +1,4 @@
-# Todo Whiteboard Backend
+# Scribblydo Backend
 
 A FastAPI backend for managing post-it notes on a digital whiteboard with real-time collaboration features.
 
@@ -152,7 +152,7 @@ uvicorn app.main:app --reload
 | `DATABASE_URL` | Full database URL | - |
 | `DB_HOST` | Database host | `localhost` |
 | `DB_PORT` | Database port | `5432` |
-| `DB_NAME` | Database name | `todo_whiteboard` |
+| `DB_NAME` | Database name | `scribblydo` |
 | `DB_USER` | Database user | `postgres` |
 | `DB_PASSWORD` | Database password | `postgres` |
 | `SECRET_KEY` | JWT signing key | (required) |

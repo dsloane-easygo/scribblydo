@@ -9,7 +9,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=todo_whiteboard
+      - DB_NAME=scribblydo
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DEBUG=false
@@ -25,7 +25,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
-      - todo-network
+      - scribblydo-network
 
   nats:
     image: nats:2.10-alpine
@@ -35,12 +35,12 @@ services:
     command: ["--jetstream", "--http_port", "8222"]
     restart: unless-stopped
     networks:
-      - todo-network
+      - scribblydo-network
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: todo_whiteboard
+      POSTGRES_DB: scribblydo
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -49,13 +49,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d todo_whiteboard"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d scribblydo"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - todo-network
+      - scribblydo-network
 
   # Migration service - runs once and exits before backend starts
   migrate:
@@ -67,14 +67,14 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=todo_whiteboard
+      - DB_NAME=scribblydo
       - DB_USER=postgres
       - DB_PASSWORD=postgres
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - todo-network
+      - scribblydo-network
 
   # Test runner service - runs e2e tests
   test:
@@ -84,10 +84,10 @@ services:
       target: production
     command: ["pytest", "-v", "--tb=short"]
     environment:
-      - TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/todo_whiteboard_test
+      - TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/scribblydo_test
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=todo_whiteboard_test
+      - DB_NAME=scribblydo_test
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - SECRET_KEY=test-secret-key
@@ -98,7 +98,7 @@ services:
       nats:
         condition: service_started
     networks:
-      - todo-network
+      - scribblydo-network
     profiles:
       - test
 
@@ -106,5 +106,5 @@ volumes:
   postgres_data:
 
 networks:
-  todo-network:
+  scribblydo-network:
     driver: bridge

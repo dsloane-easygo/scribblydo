@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
-  namespace: todo-app
+  namespace: scribblydo
   labels:
     app.kubernetes.io/name: backend
     app.kubernetes.io/component: api
-    app.kubernetes.io/part-of: todo-application
+    app.kubernetes.io/part-of: scribblydo-application
 spec:
   replicas: 2
   strategy:
@@ -23,7 +23,7 @@ spec:
       labels:
         app.kubernetes.io/name: backend
         app.kubernetes.io/component: api
-        app.kubernetes.io/part-of: todo-application
+        app.kubernetes.io/part-of: scribblydo-application
     spec:
       securityContext:
         runAsNonRoot: true
@@ -42,17 +42,17 @@ spec:
             - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_HOST
             - name: DB_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_PORT
             - name: DB_NAME
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_NAME
             - name: DB_USER
               valueFrom:
@@ -85,17 +85,17 @@ spec:
             - name: DB_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_HOST
             - name: DB_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_PORT
             - name: DB_NAME
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DB_NAME
             - name: DB_USER
               valueFrom:
@@ -110,12 +110,12 @@ spec:
             - name: DEBUG
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: DEBUG
             - name: CORS_ORIGINS
               valueFrom:
                 configMapKeyRef:
-                  name: todo-app-config
+                  name: scribblydo-config
                   key: CORS_ORIGINS
             - name: SECRET_KEY
               valueFrom:

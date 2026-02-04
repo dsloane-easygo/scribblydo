@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add real-time collaboration features to the Todo Whiteboard application including live cursor tracking, instant note updates, user presence, notifications with mute/unmute, and direct/group messaging.
+Add real-time collaboration features to the Scribblydo application including live cursor tracking, instant note updates, user presence, notifications with mute/unmute, and direct/group messaging.
 
 ---
 

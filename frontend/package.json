@@ -1,5 +1,5 @@
 {
-  "name": "todo-whiteboard",
+  "name": "scribblydo",
   "version": "1.0.0",
   "description": "A whiteboard-style todo application with draggable post-it notes",
   "type": "module",

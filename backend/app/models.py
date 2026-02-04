@@ -1,4 +1,4 @@
-"""SQLAlchemy models for the Todo Whiteboard application."""
+"""SQLAlchemy models for the Scribblydo application."""
 
 import enum
 from datetime import datetime

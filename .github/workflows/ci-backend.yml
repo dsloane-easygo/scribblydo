@@ -38,7 +38,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: todo_whiteboard_test
+          POSTGRES_DB: scribblydo_test
         ports:
           - 5432:5432
         options: >-
@@ -69,10 +69,10 @@ jobs:
 
       - name: Run tests with coverage
         env:
-          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/todo_whiteboard_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/scribblydo_test
           DB_HOST: localhost
           DB_PORT: 5432
-          DB_NAME: todo_whiteboard_test
+          DB_NAME: scribblydo_test
           DB_USER: postgres
           DB_PASSWORD: postgres
           SECRET_KEY: test-secret-key-for-ci-at-least-32-chars

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # Application settings
-    app_name: str = "Todo Whiteboard API"
+    app_name: str = "Scribblydo API"
     debug: bool = False
 
     # Database settings - either use DATABASE_URL or individual components
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Individual database components (used if DATABASE_URL is not set)
     db_host: str = "localhost"
     db_port: int = 5432
-    db_name: str = "todo_whiteboard"
+    db_name: str = "scribblydo"
     db_user: str = "postgres"
     db_password: str = "postgres"
 

@@ -17,7 +17,7 @@ from app.main import app
 # Test database URL - use env var or default to test database
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/todo_whiteboard_test"
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/scribblydo_test"
 )
 
 

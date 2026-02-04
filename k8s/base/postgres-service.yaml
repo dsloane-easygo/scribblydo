@@ -2,11 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
-  namespace: todo-app
+  namespace: scribblydo
   labels:
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: todo-application
+    app.kubernetes.io/part-of: scribblydo-application
 spec:
   type: ClusterIP
   ports:

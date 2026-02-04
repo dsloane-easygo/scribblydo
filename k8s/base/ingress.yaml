@@ -1,11 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: todo-app-ingress
-  namespace: todo-app
+  name: scribblydo-ingress
+  namespace: scribblydo
   labels:
-    app.kubernetes.io/name: todo-app
-    app.kubernetes.io/part-of: todo-application
+    app.kubernetes.io/name: scribblydo
+    app.kubernetes.io/part-of: scribblydo-application
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Todo Whiteboard Platform Makefile
+# Scribblydo Platform Makefile
 # -----------------------------------------------------------------------------
 
 .PHONY: help setup teardown dev build test lint format clean
@@ -25,7 +25,7 @@ RED    := $(shell tput -Txterm setaf 1)
 RESET  := $(shell tput -Txterm sgr0)
 
 # Default namespace for Kubernetes
-K8S_NAMESPACE ?= todo-app
+K8S_NAMESPACE ?= scribblydo
 
 ## Help
 help: ## Show this help
@@ -115,16 +115,16 @@ backend-nats-cli: ## Open NATS CLI for debugging (usage: make backend-nats-cli C
 		echo "  nats pub test 'hello'         # Publish test message"; \
 		echo "  nats account info             # Show account info"; \
 		echo ""; \
-		docker run --rm -it --network backend_todo-network natsio/nats-box:latest sh -c "nats context save local --server nats://nats:4222 --select && exec sh"; \
+		docker run --rm -it --network backend_scribblydo-network natsio/nats-box:latest sh -c "nats context save local --server nats://nats:4222 --select && exec sh"; \
 	else \
-		docker run --rm -it --network backend_todo-network natsio/nats-box:latest nats -s nats://nats:4222 $(CMD); \
+		docker run --rm -it --network backend_scribblydo-network natsio/nats-box:latest nats -s nats://nats:4222 $(CMD); \
 	fi
 
 backend-shell: ## Open shell in backend container
 	cd backend && docker compose exec backend /bin/sh
 
 backend-db-shell: ## Open PostgreSQL shell
-	cd backend && docker compose exec postgres psql -U postgres -d todo_whiteboard
+	cd backend && docker compose exec postgres psql -U postgres -d scribblydo
 
 backend-test: ## Run backend tests
 	@echo "${GREEN}Running backend tests...${RESET}"
@@ -285,9 +285,9 @@ docker-prune-all: ## Remove ALL unused Docker resources (including volumes)
 
 k8s-build: ## Build Docker images for Kubernetes
 	@echo "${GREEN}Building Docker images for Kubernetes...${RESET}"
-	docker build -t todo-backend:local ./backend
-	docker build -t todo-frontend:local ./frontend
-	@echo "${GREEN}Images built: todo-backend:local, todo-frontend:local${RESET}"
+	docker build -t scribblydo-backend:local ./backend
+	docker build -t scribblydo-frontend:local ./frontend
+	@echo "${GREEN}Images built: scribblydo-backend:local, scribblydo-frontend:local${RESET}"
 
 k8s-deploy-local: ## Deploy to local Kubernetes (Docker Desktop)
 	@echo "${GREEN}Deploying to local Kubernetes...${RESET}"
@@ -323,7 +323,7 @@ k8s-port-forward: ## Port-forward frontend service to localhost:8080
 
 quick-start: ## Quick start for new developers
 	@echo "${CYAN}╔═══════════════════════════════════════════════════════════╗${RESET}"
-	@echo "${CYAN}║           Todo Whiteboard - Quick Start                    ║${RESET}"
+	@echo "${CYAN}║           Scribblydo - Quick Start                    ║${RESET}"
 	@echo "${CYAN}╚═══════════════════════════════════════════════════════════╝${RESET}"
 	@echo ""
 	@echo "${GREEN}Step 1: Setting up backend...${RESET}"

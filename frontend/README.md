@@ -1,6 +1,6 @@
-# Todo Whiteboard Frontend
+# Scribblydo Frontend
 
-A React-based frontend for the collaborative Todo Whiteboard application with real-time features.
+A React-based frontend for the collaborative Scribblydo application with real-time features.
 
 ## Features
 
@@ -124,7 +124,7 @@ proxy: {
 Build the Docker image:
 
 ```bash
-docker build -t todo-frontend:local .
+docker build -t scribblydo-frontend:local .
 ```
 
 The image uses:

@@ -2,12 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: todo-app-local
+  name: scribblydo-local
 
 resources:
   - ../../base
 
-namespace: todo-app
+namespace: scribblydo
 
 # Local environment labels
 labels:
@@ -18,17 +18,17 @@ labels:
 # Replace placeholder images with local development images
 images:
   - name: FRONTEND_IMAGE
-    newName: todo-frontend
+    newName: scribblydo-frontend
     newTag: local
   - name: BACKEND_IMAGE
-    newName: todo-backend
+    newName: scribblydo-backend
     newTag: local
 
 patches:
   # Patch ConfigMap for local environment
   - target:
       kind: ConfigMap
-      name: todo-app-config
+      name: scribblydo-config
     patch: |
       - op: replace
         path: /data/DEBUG
@@ -67,7 +67,7 @@ patches:
   # Patch ingress for local hostname
   - target:
       kind: Ingress
-      name: todo-app-ingress
+      name: scribblydo-ingress
     patch: |
       - op: replace
         path: /spec/rules/0/host

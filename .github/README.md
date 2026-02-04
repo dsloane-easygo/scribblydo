@@ -314,7 +314,7 @@ make k8s-build
 make k8s-deploy-local
 
 # Watch pods come up
-kubectl get pods -n todo-app -w
+kubectl get pods -n scribblydo -w
 
 # Access via NodePort
 open http://localhost:30080
@@ -372,7 +372,7 @@ k8s/
 |----------|-------------|---------|
 | `DB_HOST` | PostgreSQL host | `localhost` |
 | `DB_PORT` | PostgreSQL port | `5432` |
-| `DB_NAME` | Database name | `todo_whiteboard` |
+| `DB_NAME` | Database name | `scribblydo` |
 | `DB_USER` | Database username | `postgres` |
 | `DB_PASSWORD` | Database password | `postgres` |
 | `SECRET_KEY` | JWT signing key | (required) |
@@ -478,19 +478,19 @@ docker compose up -d --build
 
 **Pods stuck in Pending**
 ```bash
-kubectl describe pod -n todo-app <pod-name>
+kubectl describe pod -n scribblydo <pod-name>
 # Check for resource constraints or PVC issues
 ```
 
 **Backend CrashLoopBackOff**
 ```bash
-kubectl logs -n todo-app -l app.kubernetes.io/name=backend --previous
+kubectl logs -n scribblydo -l app.kubernetes.io/name=backend --previous
 # Check for database connection or migration errors
 ```
 
 **Init container (migration) failing**
 ```bash
-kubectl logs -n todo-app <backend-pod-name> -c migrate
+kubectl logs -n scribblydo <backend-pod-name> -c migrate
 ```
 
 ---
