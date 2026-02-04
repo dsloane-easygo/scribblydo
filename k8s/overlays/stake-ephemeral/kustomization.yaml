@@ -20,10 +20,10 @@ labels:
 # Replace placeholder images with ECR images
 images:
   - name: FRONTEND_IMAGE
-    newName: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/scribblydo-frontend
+    newName: vcluster-repository/scribblydo-frontend
     newTag: latest
   - name: BACKEND_IMAGE
-    newName: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/scribblydo-backend
+    newName: vcluster-repository/scribblydo-backend
     newTag: latest
 
 patches:
