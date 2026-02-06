@@ -131,7 +131,7 @@ spec:
       containers:
         - name: frontend
           image: FRONTEND_IMAGE
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 80
