@@ -42,8 +42,12 @@ spec:
               containerPort: 8222
               protocol: TCP
           args:
-            - "--http_port=8222"
-            - "--max_payload=1048576"
+            - "-p"
+            - "4222"
+            - "-m"
+            - "8222"
+            - "--max_payload"
+            - "1048576"
           resources:
             requests:
               cpu: 50m
