@@ -64,6 +64,11 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: SECRET_KEY
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
