@@ -168,7 +168,7 @@ jobs:
           aws lambda invoke \
             --function-name vcluster-platform-argocd-sync \
             --region ${{ env.AWS_REGION }} \
-            --payload "$(echo '{"vcluster_name": "${{ needs.prepare.outputs.vcluster_name }}"}' | base64)" \
+            --payload '{"vcluster_name": "${{ needs.prepare.outputs.vcluster_name }}"}' \
             --cli-binary-format raw-in-base64-out \
             /tmp/sync-response.json
           echo "Lambda response:"
