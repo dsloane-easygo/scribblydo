@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       vcluster_name: ${{ steps.vars.outputs.vcluster_name }}
-      branch_slug: ${{ steps.vars.outputs.branch_slug }}
+      branch: ${{ steps.vars.outputs.branch }}
       backend_repo: ${{ steps.vars.outputs.backend_repo }}
       frontend_repo: ${{ steps.vars.outputs.frontend_repo }}
     steps:
@@ -34,21 +34,19 @@ jobs:
             exit 1
           fi
 
-          # Branch slug: full branch name with slashes replaced by double hyphens
-          BRANCH_SLUG=$(echo "$BRANCH" | sed 's|/|--|g')
-
           # ECR repository paths (each is a separate ECR repository)
-          # Format: vcluster-builds/{vcluster}/{branch-slug}/{image}
-          BACKEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH_SLUG}/backend"
-          FRONTEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH_SLUG}/frontend"
+          # Use branch name directly as path - ECR supports slashes natively
+          # Format: vcluster-builds/{vcluster}/{branch}/{image}
+          BACKEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH}/backend"
+          FRONTEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH}/frontend"
 
           echo "vcluster_name=$VCLUSTER_NAME" >> $GITHUB_OUTPUT
-          echo "branch_slug=$BRANCH_SLUG" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "backend_repo=$BACKEND_REPO" >> $GITHUB_OUTPUT
           echo "frontend_repo=$FRONTEND_REPO" >> $GITHUB_OUTPUT
 
           echo "vCluster: $VCLUSTER_NAME"
-          echo "Branch slug: $BRANCH_SLUG"
+          echo "Branch: $BRANCH"
           echo "Backend repo: $BACKEND_REPO"
           echo "Frontend repo: $FRONTEND_REPO"
 
@@ -160,7 +158,7 @@ jobs:
           echo "## vCluster Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**vCluster:** ${{ needs.prepare.outputs.vcluster_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch slug:** ${{ needs.prepare.outputs.branch_slug }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ needs.prepare.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images" >> $GITHUB_STEP_SUMMARY
@@ -172,7 +170,7 @@ jobs:
           echo "### Usage in vCluster manifests" >> $GITHUB_STEP_SUMMARY
           echo "Use these image references in your Kubernetes manifests inside the vCluster:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch_slug }}/backend:latest" >> $GITHUB_STEP_SUMMARY
-          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch_slug }}/frontend:latest" >> $GITHUB_STEP_SUMMARY
+          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch }}/backend:latest" >> $GITHUB_STEP_SUMMARY
+          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch }}/frontend:latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "Kyverno will rewrite these to the full ECR paths automatically." >> $GITHUB_STEP_SUMMARY
