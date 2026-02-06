@@ -17,13 +17,12 @@ labels:
       cloud-provider: aws
     includeSelectors: false
 
-# Replace placeholder images with ECR images
 images:
   - name: FRONTEND_IMAGE
-    newName: vcluster-repository/scribblydo-frontend
+    newName: vcluster-repository/vc-scribblydo/test/frontend
     newTag: latest
   - name: BACKEND_IMAGE
-    newName: vcluster-repository/scribblydo-backend
+    newName: vcluster-repository/vc-scribblydo/test/backend
     newTag: latest
 
 patches:
