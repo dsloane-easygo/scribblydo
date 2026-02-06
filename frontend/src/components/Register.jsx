@@ -60,40 +60,38 @@ function Register({ onSwitchToLogin }) {
         {error && <div className={styles.error}>{error}</div>}
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="firstName">First Name</label>
-              <input
-                id="firstName"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                maxLength={100}
-                autoComplete="given-name"
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="lastName">Last Name</label>
-              <input
-                id="lastName"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                maxLength={100}
-                autoComplete="family-name"
-                disabled={loading}
-              />
-            </div>
+          <div className={styles.formGroup}>
+            <input
+              id="firstName"
+              type="text"
+              placeholder="First Name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              maxLength={100}
+              autoComplete="given-name"
+              autoFocus
+              disabled={loading}
+            />
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="username">Username</label>
+            <input
+              id="lastName"
+              type="text"
+              placeholder="Last Name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              maxLength={100}
+              autoComplete="family-name"
+              disabled={loading}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
             <input
               id="username"
               type="text"
+              placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -105,10 +103,10 @@ function Register({ onSwitchToLogin }) {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -119,10 +117,10 @@ function Register({ onSwitchToLogin }) {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="confirmPassword">Confirm Password</label>
             <input
               id="confirmPassword"
               type="password"
+              placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
