@@ -34,13 +34,16 @@ class NATSClientManager:
         nats_url = getattr(settings, "nats_url", "nats://nats:4222")
 
         try:
-            self._client = await nats.connect(
-                nats_url,
-                reconnect_time_wait=2,
-                max_reconnect_attempts=-1,  # Unlimited reconnection attempts
-                error_cb=self._error_callback,
-                disconnected_cb=self._disconnected_callback,
-                reconnected_cb=self._reconnected_callback,
+            self._client = await asyncio.wait_for(
+                nats.connect(
+                    nats_url,
+                    reconnect_time_wait=2,
+                    max_reconnect_attempts=3,
+                    error_cb=self._error_callback,
+                    disconnected_cb=self._disconnected_callback,
+                    reconnected_cb=self._reconnected_callback,
+                ),
+                timeout=10,
             )
             self._connected = True
             logger.info(f"Connected to NATS at {nats_url}")
