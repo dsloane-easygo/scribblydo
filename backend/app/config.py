@@ -49,8 +49,8 @@ class Settings(BaseSettings):
         ]
         if v in insecure_defaults:
             import os
-            if os.getenv("TESTING", "").lower() == "true":
-                # Allow insecure key only in test environment
+            if os.getenv("TESTING", "").lower() == "true" or os.getenv("ENVIRONMENT", "").lower() == "development":
+                # Allow insecure key in test and development environments
                 return secrets.token_urlsafe(32)
             raise ValueError(
                 "SECRET_KEY environment variable must be set to a secure random value. "

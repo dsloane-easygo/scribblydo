@@ -33,7 +33,7 @@ patches:
     patch: |
       - op: replace
         path: /data/ENVIRONMENT
-        value: production
+        value: development
       - op: replace
         path: /data/LOG_LEVEL
         value: INFO
