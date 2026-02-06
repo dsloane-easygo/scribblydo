@@ -93,14 +93,14 @@ patches:
               - todo.vclusters.company.com
             secretName: scribblydo-tls
 
-  # Increase replicas for production
+  # Single replica for vCluster dev environments
   - target:
       kind: Deployment
       name: frontend
     patch: |
       - op: replace
         path: /spec/replicas
-        value: 3
+        value: 1
 
   - target:
       kind: Deployment
@@ -108,7 +108,7 @@ patches:
     patch: |
       - op: replace
         path: /spec/replicas
-        value: 3
+        value: 1
 
   # Production resource allocation
   - target:
