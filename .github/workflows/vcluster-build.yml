@@ -61,6 +61,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Create ECR repositories if needed
+        run: |
+          BACKEND_REPO="${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend"
+          FRONTEND_REPO="${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend"
+
+          for REPO in "$BACKEND_REPO" "$FRONTEND_REPO"; do
+            aws ecr describe-repositories --repository-names "$REPO" 2>/dev/null || \
+              aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+          done
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
