@@ -69,6 +69,11 @@ spec:
                 secretKeyRef:
                   name: backend-secret
                   key: SECRET_KEY
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: scribblydo-config
+                  key: ENVIRONMENT
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
