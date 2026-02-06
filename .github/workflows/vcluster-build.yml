@@ -24,7 +24,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Extract vCluster name from branch
+      - name: Extract vCluster name and path from branch
         id: vcluster
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
@@ -32,7 +32,6 @@ jobs:
 
           # Extract vcluster name: everything after "vc-" but before first "/"
           # e.g., "vc-scribblydo/my-feature" -> "scribblydo"
-          # e.g., "vc-myenv" -> "myenv"
           VCLUSTER_NAME=$(echo "$BRANCH" | sed -E 's|^vc-([^/]+).*|\1|')
 
           if [ -z "$VCLUSTER_NAME" ]; then
@@ -43,9 +42,14 @@ jobs:
           echo "vcluster_name=$VCLUSTER_NAME" >> $GITHUB_OUTPUT
           echo "Extracted vCluster name: $VCLUSTER_NAME"
 
-          # Use short SHA for tag
-          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          # Use full branch name as path (replacing any remaining / with -)
+          # e.g., "vc-scribblydo/my-feature" -> "vc-scribblydo/my-feature"
+          BRANCH_PATH="$BRANCH"
+          echo "branch_path=$BRANCH_PATH" >> $GITHUB_OUTPUT
+          echo "Branch path: $BRANCH_PATH"
+
+          # Use full commit SHA for tag
+          echo "commit_sha=$GITHUB_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,8 +71,7 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-backend:${{ steps.vcluster.outputs.short_sha }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-backend:latest
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend:${{ steps.vcluster.outputs.commit_sha }}
           platforms: linux/amd64
           cache-from: type=gha,scope=backend-${{ steps.vcluster.outputs.vcluster_name }}
           cache-to: type=gha,scope=backend-${{ steps.vcluster.outputs.vcluster_name }},mode=max
@@ -81,8 +84,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-frontend:${{ steps.vcluster.outputs.short_sha }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-frontend:latest
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend:${{ steps.vcluster.outputs.commit_sha }}
           build-args: |
             VITE_API_URL=/api
             VITE_APP_NAME=ScribblyDo
@@ -96,8 +98,9 @@ jobs:
           echo "## vCluster Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**vCluster:** ${{ steps.vcluster.outputs.vcluster_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ steps.vcluster.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ steps.vcluster.outputs.branch_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.vcluster.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images pushed:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-backend:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/scribblydo-frontend:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend:${{ steps.vcluster.outputs.commit_sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend:${{ steps.vcluster.outputs.commit_sha }}\`" >> $GITHUB_STEP_SUMMARY
