@@ -36,9 +36,9 @@ jobs:
 
           # ECR repository paths (each is a separate ECR repository)
           # Use branch name directly as path - ECR supports slashes natively
-          # Format: vcluster-builds/{vcluster}/{branch}/{image}
-          BACKEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH}/backend"
-          FRONTEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH}/frontend"
+          # Format: vcluster-builds/{branch}/{image}
+          BACKEND_REPO="vcluster-builds/${BRANCH}/backend"
+          FRONTEND_REPO="vcluster-builds/${BRANCH}/frontend"
 
           echo "vcluster_name=$VCLUSTER_NAME" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
