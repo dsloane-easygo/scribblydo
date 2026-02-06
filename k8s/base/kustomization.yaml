@@ -18,6 +18,8 @@ resources:
   - configmap.yaml
   - postgres-deployment.yaml
   - postgres-service.yaml
+  - nats-deployment.yaml
+  - nats-service.yaml
   - backend-deployment.yaml
   - backend-service.yaml
   - frontend-deployment.yaml
