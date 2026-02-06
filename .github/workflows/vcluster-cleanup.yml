@@ -1,0 +1,137 @@
+name: vCluster ECR Cleanup
+
+# Trigger on branch delete (immediate cleanup) and daily sweep (safety net)
+on:
+  delete:
+  schedule:
+    # Run daily at 3am UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_PREFIX: vcluster-builds/vc-
+
+jobs:
+  # Immediate cleanup when a vc-* branch is deleted
+  branch-delete:
+    name: Clean up deleted branch
+    runs-on: ubuntu-latest
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'vc-')
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::379820352565:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Delete ECR repositories for branch
+        run: |
+          BRANCH="${{ github.event.ref }}"
+          echo "Branch deleted: $BRANCH"
+
+          # List all repos matching this branch prefix
+          REPOS=$(aws ecr describe-repositories \
+            --region ${{ env.AWS_REGION }} \
+            --query "repositories[?starts_with(repositoryName, 'vcluster-builds/${BRANCH}/')].repositoryName" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$REPOS" ]; then
+            echo "No ECR repositories found for branch $BRANCH"
+            exit 0
+          fi
+
+          DELETED=0
+          for REPO in $REPOS; do
+            echo "Deleting ECR repository: $REPO"
+            aws ecr delete-repository \
+              --repository-name "$REPO" \
+              --region ${{ env.AWS_REGION }} \
+              --force || echo "  Failed to delete $REPO"
+            DELETED=$((DELETED + 1))
+          done
+
+          echo "## ECR Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** $BRANCH" >> $GITHUB_STEP_SUMMARY
+          echo "**Repositories deleted:** $DELETED" >> $GITHUB_STEP_SUMMARY
+
+  # Scheduled sweep to catch orphaned repos
+  sweep:
+    name: Sweep orphaned ECR repos
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::379820352565:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Find and delete orphaned repos
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Scanning for orphaned vCluster build ECR repositories..."
+
+          # Get all ECR repos under vcluster-builds/vc-*
+          ALL_REPOS=$(aws ecr describe-repositories \
+            --region ${{ env.AWS_REGION }} \
+            --query "repositories[?starts_with(repositoryName, '${{ env.ECR_PREFIX }}')].repositoryName" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$ALL_REPOS" ]; then
+            echo "No vCluster build repositories found"
+            exit 0
+          fi
+
+          # Extract unique branch names from repo paths
+          # Repo format: vcluster-builds/{branch}/{image}
+          # Strip "vcluster-builds/" prefix and "/{image}" suffix
+          BRANCHES=$(echo "$ALL_REPOS" | tr '\t' '\n' | sed 's|^vcluster-builds/||' | sed 's|/[^/]*$||' | sort -u)
+
+          DELETED=0
+          KEPT=0
+          DELETED_LIST=""
+
+          for BRANCH in $BRANCHES; do
+            # Check if branch exists in GitHub
+            BRANCH_EXISTS=$(gh api "repos/${{ github.repository }}/branches/$BRANCH" --silent 2>/dev/null && echo "yes" || echo "no")
+
+            if [ "$BRANCH_EXISTS" = "no" ]; then
+              echo "Branch '$BRANCH' no longer exists - cleaning up repos"
+
+              # Find all repos for this branch
+              BRANCH_REPOS=$(echo "$ALL_REPOS" | tr '\t' '\n' | grep "^vcluster-builds/${BRANCH}/")
+
+              for REPO in $BRANCH_REPOS; do
+                echo "  Deleting: $REPO"
+                aws ecr delete-repository \
+                  --repository-name "$REPO" \
+                  --region ${{ env.AWS_REGION }} \
+                  --force 2>/dev/null || echo "  Failed to delete $REPO"
+                DELETED=$((DELETED + 1))
+                DELETED_LIST="${DELETED_LIST}\n| \`${REPO}\` | ${BRANCH} |"
+              done
+            else
+              echo "Branch '$BRANCH' still exists - keeping repos"
+              KEPT=$((KEPT + 1))
+            fi
+          done
+
+          echo "## ECR Sweep Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Active branches:** $KEPT" >> $GITHUB_STEP_SUMMARY
+          echo "**Repositories deleted:** $DELETED" >> $GITHUB_STEP_SUMMARY
+          if [ "$DELETED" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Repository | Branch |" >> $GITHUB_STEP_SUMMARY
+            echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo -e "$DELETED_LIST" >> $GITHUB_STEP_SUMMARY
+          fi
