@@ -10,28 +10,23 @@ on:
 env:
   AWS_REGION: eu-west-1
   ECR_REGISTRY: 379820352565.dkr.ecr.eu-west-1.amazonaws.com
-  ECR_REPOSITORY: vcluster-builds
 
 jobs:
-  build-and-push:
-    name: Build and Push to ECR
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
+    outputs:
+      vcluster_name: ${{ steps.vars.outputs.vcluster_name }}
+      branch_slug: ${{ steps.vars.outputs.branch_slug }}
+      backend_repo: ${{ steps.vars.outputs.backend_repo }}
+      frontend_repo: ${{ steps.vars.outputs.frontend_repo }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Extract vCluster name and path from branch
-        id: vcluster
+      - name: Extract build variables
+        id: vars
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "Branch: $BRANCH"
 
           # Extract vcluster name: everything after "vc-" but before first "/"
-          # e.g., "vc-scribblydo/my-feature" -> "scribblydo"
           VCLUSTER_NAME=$(echo "$BRANCH" | sed -E 's|^vc-([^/]+).*|\1|')
 
           if [ -z "$VCLUSTER_NAME" ]; then
@@ -39,17 +34,34 @@ jobs:
             exit 1
           fi
 
+          # Branch slug: full branch name with slashes replaced by double hyphens
+          BRANCH_SLUG=$(echo "$BRANCH" | sed 's|/|--|g')
+
+          # ECR repository paths (each is a separate ECR repository)
+          # Format: vcluster-builds/{vcluster}/{branch-slug}/{image}
+          BACKEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH_SLUG}/backend"
+          FRONTEND_REPO="vcluster-builds/${VCLUSTER_NAME}/${BRANCH_SLUG}/frontend"
+
           echo "vcluster_name=$VCLUSTER_NAME" >> $GITHUB_OUTPUT
-          echo "Extracted vCluster name: $VCLUSTER_NAME"
+          echo "branch_slug=$BRANCH_SLUG" >> $GITHUB_OUTPUT
+          echo "backend_repo=$BACKEND_REPO" >> $GITHUB_OUTPUT
+          echo "frontend_repo=$FRONTEND_REPO" >> $GITHUB_OUTPUT
 
-          # Use full branch name as path (replacing any remaining / with -)
-          # e.g., "vc-scribblydo/my-feature" -> "vc-scribblydo/my-feature"
-          BRANCH_PATH="$BRANCH"
-          echo "branch_path=$BRANCH_PATH" >> $GITHUB_OUTPUT
-          echo "Branch path: $BRANCH_PATH"
+          echo "vCluster: $VCLUSTER_NAME"
+          echo "Branch slug: $BRANCH_SLUG"
+          echo "Backend repo: $BACKEND_REPO"
+          echo "Frontend repo: $FRONTEND_REPO"
 
-          # Use full commit SHA for tag
-          echo "commit_sha=$GITHUB_SHA" >> $GITHUB_OUTPUT
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: prepare
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -58,59 +70,109 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR repositories if needed
+      - name: Ensure ECR repository exists
         run: |
-          BACKEND_REPO="${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend"
-          FRONTEND_REPO="${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend"
-
-          for REPO in "$BACKEND_REPO" "$FRONTEND_REPO"; do
-            aws ecr describe-repositories --repository-names "$REPO" 2>/dev/null || \
-              aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
-          done
+          aws ecr describe-repositories \
+            --repository-names "${{ needs.prepare.outputs.backend_repo }}" \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name "${{ needs.prepare.outputs.backend_repo }}" \
+            --region ${{ env.AWS_REGION }} \
+            --image-tag-mutability MUTABLE \
+            --image-scanning-configuration scanOnPush=true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push backend
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend:latest
+            ${{ env.ECR_REGISTRY }}/${{ needs.prepare.outputs.backend_repo }}:latest
           platforms: linux/amd64
-          cache-from: type=gha,scope=backend-${{ steps.vcluster.outputs.vcluster_name }}
-          cache-to: type=gha,scope=backend-${{ steps.vcluster.outputs.vcluster_name }},mode=max
+          cache-from: type=gha,scope=backend-${{ needs.prepare.outputs.vcluster_name }}
+          cache-to: type=gha,scope=backend-${{ needs.prepare.outputs.vcluster_name }},mode=max
           provenance: false
 
-      - name: Build and push frontend
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: prepare
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::379820352565:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories \
+            --repository-names "${{ needs.prepare.outputs.frontend_repo }}" \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name "${{ needs.prepare.outputs.frontend_repo }}" \
+            --region ${{ env.AWS_REGION }} \
+            --image-tag-mutability MUTABLE \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend:latest
+            ${{ env.ECR_REGISTRY }}/${{ needs.prepare.outputs.frontend_repo }}:latest
           build-args: |
             VITE_API_URL=/api
             VITE_APP_NAME=ScribblyDo
           platforms: linux/amd64
-          cache-from: type=gha,scope=frontend-${{ steps.vcluster.outputs.vcluster_name }}
-          cache-to: type=gha,scope=frontend-${{ steps.vcluster.outputs.vcluster_name }},mode=max
+          cache-from: type=gha,scope=frontend-${{ needs.prepare.outputs.vcluster_name }}
+          cache-to: type=gha,scope=frontend-${{ needs.prepare.outputs.vcluster_name }},mode=max
           provenance: false
 
-      - name: Summary
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [prepare, build-backend, build-frontend]
+    if: always()
+    steps:
+      - name: Build summary
         run: |
-          echo "## vCluster Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## vCluster Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**vCluster:** ${{ steps.vcluster.outputs.vcluster_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ steps.vcluster.outputs.branch_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ steps.vcluster.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**vCluster:** ${{ needs.prepare.outputs.vcluster_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch slug:** ${{ needs.prepare.outputs.branch_slug }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Images pushed:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-backend:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}/${{ steps.vcluster.outputs.vcluster_name }}/${{ steps.vcluster.outputs.branch_path }}/scribblydo-frontend:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Images" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | Tag | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ needs.prepare.outputs.backend_repo }}\` | latest | ${{ needs.build-backend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ needs.prepare.outputs.frontend_repo }}\` | latest | ${{ needs.build-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Usage in vCluster manifests" >> $GITHUB_STEP_SUMMARY
+          echo "Use these image references in your Kubernetes manifests inside the vCluster:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch_slug }}/backend:latest" >> $GITHUB_STEP_SUMMARY
+          echo "image: vcluster-repository/${{ needs.prepare.outputs.branch_slug }}/frontend:latest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "Kyverno will rewrite these to the full ECR paths automatically." >> $GITHUB_STEP_SUMMARY
