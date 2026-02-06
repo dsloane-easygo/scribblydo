@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/part-of: scribblydo-application
 spec:
   replicas: 2
+  revisionHistoryLimit: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
